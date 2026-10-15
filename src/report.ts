@@ -111,7 +111,9 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
 
   const summary = ok
     ? `<p class="result">Passed. ${passed} of ${total} steps in ${fmtMs(t1 - t0)}.</p>`
-    : `<p class="result failed">Failed at step ${failedGroup?.step?.index ?? '?'} of ${total}.${
+    : !failedGroup && end?.error
+      ? `<p class="result failed">Failed before the first step.</p><p class="error">${esc(end.error)}</p>`
+      : `<p class="result failed">Failed at step ${failedGroup?.step?.index ?? '?'} of ${total}.${
         failedGroup ? ` <a href="#step-${failedGroup.step?.index ?? 'x'}">Go to the failure</a>` : ''
       }</p>`;
 

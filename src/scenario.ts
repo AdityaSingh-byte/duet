@@ -230,11 +230,16 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
   let passed = 0;
   let failed: ScenarioResult['failed'];
   try {
-    // Mark every phone's log first, so a failure can show exactly what each device logged during the run.
-    for (const [actor, def] of Object.entries(scenario.actors)) {
-      if (def.phone) await (await phoneFor(actor)).markLogs();
+    // Connect every phone and mark its log first, so a failure can show exactly what each device logged during the run.
+    try {
+      for (const [actor, def] of Object.entries(scenario.actors)) {
+        if (def.phone) await (await phoneFor(actor)).markLogs();
+      }
+    } catch (e) {
+      failed = { index: 0, source: 'setup', error: (e as Error).message };
+      log(`  setup failed: ${failed.error}`);
     }
-    for (const step of scenario.steps) {
+    for (const step of failed ? [] : scenario.steps) {
       run.record({ actor: 'scenario', action: 'step', ok: true, args: { index: step.index, source: step.source } });
       log(`  ${step.index}. ${step.source}`);
       try {
@@ -257,7 +262,7 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
         break;
       }
     }
-    if (failed) await collectEvidence(run, phones, browsers, log);
+    if (failed && failed.index > 0) await collectEvidence(run, phones, browsers, log);
   } finally {
     for (const [name, b] of browsers) {
       if (launchedHere.has(name) && !opts.keepOpen) await b.close(registry).catch(() => {});

@@ -89,3 +89,28 @@ describe('variable fallbacks', () => {
     expect(loadScenario(p).actors.host!.browser!.url).toBe('http://other');
   });
 });
+
+describe('runScenario', () => {
+  it('a phone that cannot be reached fails the run before step 1, and the record says so', async () => {
+    const { runScenario } = await import('../src/scenario.js');
+    const { buildReport } = await import('../src/report.js');
+    const { RunDir } = await import('../src/run.js');
+    const { readFileSync } = await import('node:fs');
+    const prev = process.env.DUET_ADB;
+    process.env.DUET_ADB = join(dir, 'no-such-adb');
+    try {
+      const p = file('j.yaml', `actors:\n  viewer:\n    phone:\n      package: dev.duet.sample\nsteps: |\n  viewer: launch\n`);
+      const r = await runScenario(p, { cfg: {}, runsDir: join(dir, 'runs') });
+      expect(r.ok).toBe(false);
+      expect(r.passed).toBe(0);
+      expect(r.failed).toMatchObject({ index: 0, source: 'setup' });
+      expect(r.failed!.error).toMatch(/adb not found/);
+      const end = new RunDir(r.runDir).events().find((e) => e.action === 'end')!;
+      expect(end.ok).toBe(false);
+      expect(readFileSync(buildReport(r.runDir), 'utf8')).toContain('Failed before the first step.');
+    } finally {
+      if (prev === undefined) delete process.env.DUET_ADB;
+      else process.env.DUET_ADB = prev;
+    }
+  });
+});
