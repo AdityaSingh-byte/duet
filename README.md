@@ -118,7 +118,7 @@ A test phone is often the developer's own phone, in use while the agent works. B
 | launch (open-link, launch) | yes | yes | no |
 | act (tap, swipe, type, keys) | yes | no | no |
 
-Anything it cannot read counts as unsafe. Screenshots are refused too when another app is in front, so the agent never captures someone's messages. `install` never uninstalls, because that would wipe the app's data and sign-in. `logs` reads logcat without clearing it. `--no-guard` turns this off, for a dedicated lab device.
+Anything it cannot read counts as unsafe. Screenshots are refused too when another app is in front, so the agent never captures someone's messages. `install` never uninstalls, because that would wipe the app's data and sign-in. `logs` reads logcat without clearing it; it covers the whole device (system lines such as rotation changes are often the clue), so pass `--app` to keep only your app's lines. `--no-guard` turns the checks off, for a dedicated lab device.
 
 ## How it compares
 
