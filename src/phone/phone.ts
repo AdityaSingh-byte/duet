@@ -455,28 +455,8 @@ export class Phone {
     return out;
   }
 
-  // ---- recording ----------------------------------------------------------
-
-  /** Runs one step and appends it to events.jsonl, failed or not. */
-  private async step<T>(action: string, args: Record<string, unknown>, fn: () => Promise<{ result: T; shot?: string; log?: string }>): Promise<T> {
-    const started = Date.now();
-    try {
-      const out = await fn();
-      this.run.record({
-        actor: 'phone',
-        action,
-        args,
-        ok: true,
-        result: out.result,
-        shot: out.shot ? this.run.rel(out.shot) : undefined,
-        log: out.log ? this.run.rel(out.log) : undefined,
-        ms: Date.now() - started,
-      });
-      return out.result;
-    } catch (e) {
-      this.run.record({ actor: 'phone', action, args, ok: false, error: (e as Error).message, ms: Date.now() - started });
-      throw e;
-    }
+  private step<T>(action: string, args: Record<string, unknown>, fn: () => Promise<{ result: T; shot?: string; log?: string }>): Promise<T> {
+    return this.run.step('phone', action, args, fn);
   }
 }
 

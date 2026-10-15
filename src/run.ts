@@ -36,6 +36,36 @@ export class RunDir {
     return full;
   }
 
+  /**
+   * Runs one step and appends it to events.jsonl, failed or not.
+   * `fn` returns the result plus any screenshot or log file the step produced.
+   */
+  async step<T>(
+    actor: string,
+    action: string,
+    args: Record<string, unknown>,
+    fn: () => Promise<{ result: T; shot?: string; log?: string }>,
+  ): Promise<T> {
+    const started = Date.now();
+    try {
+      const out = await fn();
+      this.record({
+        actor,
+        action,
+        args,
+        ok: true,
+        result: out.result,
+        shot: out.shot ? this.rel(out.shot) : undefined,
+        log: out.log ? this.rel(out.log) : undefined,
+        ms: Date.now() - started,
+      });
+      return out.result;
+    } catch (e) {
+      this.record({ actor, action, args, ok: false, error: (e as Error).message, ms: Date.now() - started });
+      throw e;
+    }
+  }
+
   events(): RunEvent[] {
     try {
       return readFileSync(join(this.dir, 'events.jsonl'), 'utf8')

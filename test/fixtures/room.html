@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Test room</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 32px; color: #1f2933; }
+  video { width: 480px; background: #ddd; display: block; margin-top: 12px; }
+  label { display: block; margin-bottom: 8px; }
+</style>
+<h1>Test room</h1>
+<label>Your name <input id="name" autocomplete="off"></label>
+<button id="join">Join</button>
+<button id="share" aria-label="Share screen" hidden>Share</button>
+<p id="status">Not joined</p>
+<video id="stage" autoplay muted playsinline></video>
+<script>
+  const $ = (id) => document.getElementById(id);
+  $('join').onclick = async () => {
+    const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    $('status').textContent = `Joined as ${$('name').value || 'guest'} with ${cam.getTracks().length} tracks`;
+    $('share').hidden = false;
+  };
+  $('share').onclick = async () => {
+    const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    $('stage').srcObject = screen;
+    $('status').textContent = `Sharing: ${screen.getVideoTracks()[0].label}`;
+  };
+</script>
