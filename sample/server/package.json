@@ -1,0 +1,12 @@
+{
+  "name": "duet-sample-server",
+  "private": true,
+  "type": "module",
+  "description": "Relay for the duet sample: a host page shares a tab, viewers receive its frames.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample room host</title>
+<style>
+  :root { --text: #1d1d1f; --muted: #5f6368; --line: #e3e3e3; --field: #f4f4f4; --stage: #111; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: #fff; }
+  main { max-width: 760px; padding: 32px 16px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input { font: inherit; padding: 8px 10px; border: 0; border-radius: 6px; background: var(--field); width: 220px; }
+  .row { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 16px; }
+  button { font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
+  button.primary { background: var(--text); color: #fff; border-color: var(--text); }
+  button:focus-visible, input:focus-visible { outline: 2px solid #1a5fb4; outline-offset: 2px; }
+  button[hidden] { display: none; }
+  #status { color: var(--muted); margin: 0 0 16px; }
+  video { width: 100%; aspect-ratio: 16 / 9; background: var(--stage); border-radius: 6px; display: block; }
+  ul { list-style: none; padding: 0; margin: 16px 0 0; }
+  li { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+  li span { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Host a room</h1>
+  <div class="row">
+    <div><label for="name">Your name</label><input id="name" value="Host"></div>
+    <div><label for="room">Room</label><input id="room" value="demo"></div>
+    <button id="join" class="primary">Join room</button>
+  </div>
+  <p id="status">Not in a room.</p>
+  <div class="row">
+    <button id="present" class="primary" hidden>Present your screen</button>
+    <button id="stop" hidden>Stop presenting</button>
+  </div>
+  <video id="preview" autoplay muted playsinline></video>
+  <ul id="people" aria-label="In the room"></ul>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let ws, stream, timer;
+  const canvas = document.createElement('canvas');
+
+  function setStatus(text) { $('status').textContent = text; }
+
+  $('join').onclick = () => {
+    const room = $('room').value.trim() || 'demo';
+    const name = $('name').value.trim() || 'Host';
+    ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws?room=${encodeURIComponent(room)}&role=host&name=${encodeURIComponent(name)}`);
+    ws.onopen = () => {
+      setStatus(`In room ${room}.`);
+      $('join').hidden = true;
+      $('present').hidden = false;
+    };
+    ws.onclose = () => setStatus('Disconnected from the room server.');
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type !== 'people') return;
+      $('people').replaceChildren(...msg.people.map((p) => {
+        const li = document.createElement('li');
+        li.textContent = p.name;
+        const role = document.createElement('span');
+        role.textContent = p.role === 'host' ? 'Host' : 'Viewer';
+        li.append(role);
+        return li;
+      }));
+    };
+  };
+
+  $('present').onclick = async () => {
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 10 } });
+    } catch (e) {
+      setStatus(`Screen sharing was not started: ${e.message}`);
+      return;
+    }
+    const video = $('preview');
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    const track = stream.getVideoTracks()[0];
+    track.onended = stop;
+    // The label says what is shared: web-contents-media-stream://... for a tab, screen:... for a whole screen.
+    $('status').dataset.track = track.label;
+    setStatus(track.label.startsWith('web-contents') ? 'Presenting a browser tab.' : 'Presenting your screen.');
+    $('present').hidden = true;
+    $('stop').hidden = false;
+    // About 5 frames a second, 960 px wide: plenty for slides, light on the relay.
+    timer = setInterval(() => {
+      if (!video.videoWidth || ws.readyState !== WebSocket.OPEN) return;
+      canvas.width = 960;
+      canvas.height = Math.round((960 * video.videoHeight) / video.videoWidth);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      ws.send(JSON.stringify({ type: 'frame', data: canvas.toDataURL('image/jpeg', 0.7) }));
+    }, 200);
+  };
+
+  function stop() {
+    clearInterval(timer);
+    stream?.getTracks().forEach((t) => t.stop());
+    $('preview').srcObject = null;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stopped' }));
+    setStatus('Stopped presenting.');
+    $('stop').hidden = true;
+    $('present').hidden = false;
+  }
+  $('stop').onclick = stop;
+</script>
+</body>
+</html>
