@@ -4,7 +4,7 @@ Lets an AI coding agent test a feature the way a QA person would: on a **real An
 
 duet is not a testing framework. It is a small harness around adb and Puppeteer. It gives an agent (Claude Code through MCP, or anything that can run a CLI) safe commands that each do one thing, records every step with its screenshot, and keeps the device log at hand. The agent can then find out *why* something failed, fix the code, and run the same steps again.
 
-> **Status: early (0.1).** The browser actor, scenarios, reports and the MCP server are tested end to end. The phone actor is unit tested against a simulated adb and has not yet been run against a range of real devices. If the guard misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
+> **Status: early (0.1).** The browser actor, scenarios, reports and the MCP server are tested end to end. The phone actor is unit tested against a simulated adb but has not yet been verified on a physical device. If the guard misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
 
 ## Contents
 
