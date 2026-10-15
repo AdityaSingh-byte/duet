@@ -194,7 +194,7 @@ export interface CommandContext {
 
 // ---- phone --------------------------------------------------------------------
 
-const PHONE_COMMANDS = new Set([
+export const PHONE_COMMANDS = new Set([
   'devices', 'status', 'screenshot', 'ui', 'wait-for', 'rotation', 'reverse', 'tap', 'swipe', 'type', 'key', 'back', 'open-link', 'launch', 'logs', 'install',
 ]);
 
@@ -276,7 +276,7 @@ export async function phoneCommand(o: Values, positionals: string[], ctx: Comman
 
 // ---- browser ------------------------------------------------------------------
 
-const BROWSER_COMMANDS = new Set(['open', 'goto', 'click', 'fill', 'press', 'wait-for', 'say', 'screenshot', 'ui', 'new-tab', 'eval', 'list', 'close']);
+export const BROWSER_COMMANDS = new Set(['open', 'goto', 'click', 'fill', 'press', 'wait-for', 'say', 'screenshot', 'ui', 'new-tab', 'eval', 'list', 'close']);
 
 export async function browserCommand(o: Values, positionals: string[], ctx: CommandContext): Promise<Record<string, unknown>> {
   const [cmd, name, ...pos] = positionals as [string, string | undefined, ...string[]];

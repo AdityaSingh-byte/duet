@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Let an AI coding agent test a feature across a real Android phone and a visible browser, safely and in plain sight.",
   "license": "MIT",
+  "author": "Aditya Singh (https://github.com/AdityaSingh-byte)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdityaSingh-byte/duet.git"
+  },
+  "homepage": "https://github.com/AdityaSingh-byte/duet#readme",
+  "bugs": {
+    "url": "https://github.com/AdityaSingh-byte/duet/issues"
+  },
   "type": "module",
   "bin": {
     "duet": "./bin/duet.js"
@@ -16,8 +25,10 @@
   "engines": {
     "node": ">=22.12"
   },
+  "packageManager": "pnpm@12.9.1",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

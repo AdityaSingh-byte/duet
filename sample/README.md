@@ -7,13 +7,27 @@ A small, open stand-in for a live session, used to demo duet: a **host** present
 
 ## Run it
 
+You need Node 22+, adb, Java 17 or newer and the Android SDK (`ANDROID_HOME` set, or `sdk.dir` in `app/android/local.properties` after prebuild).
+
 ```sh
-cd sample/server && npm install && npm start          # http://localhost:8080
-adb reverse tcp:8080 tcp:8080                         # the phone reaches it as localhost
-cd sample/app && npm install && npx expo prebuild -p android
-cd android && ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
+# the relay and the host page, on http://localhost:8080
+cd sample/server && npm install && npm start
+
+# the viewer app (in another terminal)
+cd sample/app && npm install
+npx expo prebuild -p android
+(cd android && ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a)
 duet phone install android/app/build/outputs/apk/release/app-release.apk
+
+# the two-actor scenario, from the repository root
+duet scenario run examples/fullscreen-on-a-phone.yaml
 ```
+
+The release build is signed with the debug key, so it installs over an earlier build without losing data. The scenario runs `adb reverse tcp:8080 tcp:8080` itself, so the phone reaches the relay as `localhost`.
+
+To see the bug, build from the `demo/rotation-bug` branch instead: the scenario then fails at "rotation --expect landscape", and the report shows the log lines where full screen opens, the stage remounts, and full screen closes.
+
+`app/` started from Expo's blank TypeScript template; `app/LICENSE` is that template's license.
 
 ## The planted bug
 
