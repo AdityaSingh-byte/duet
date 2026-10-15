@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+
+# run output: screenshots, logs, events, browser profiles
+.duet/
+runs/
+profiles/
+*.log
+
+# secrets and signing material never belong in the repo
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pem
+duet.config.local.json
+
+# built apps
+*.apk
+*.aab
+
+.DS_Store

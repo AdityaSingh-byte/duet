@@ -1,0 +1,45 @@
+{
+  "name": "duet-qa",
+  "version": "0.1.0",
+  "description": "Let an AI coding agent test a feature across a real Android phone and a visible browser, safely and in plain sight.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "duet": "./bin/duet.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "android",
+    "adb",
+    "e2e",
+    "testing",
+    "ai-agent",
+    "claude-code",
+    "mcp",
+    "puppeteer"
+  ],
+  "dependencies": {
+    "pngjs": "7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pngjs": "6.0.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
