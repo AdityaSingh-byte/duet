@@ -4,7 +4,7 @@ Lets an AI coding agent test a feature the way a QA person would: on a **real An
 
 duet is not a testing framework. It is a small harness around adb and Puppeteer. It gives an agent (Claude Code through MCP, or anything that can run a CLI) safe commands that each do one thing, records every step with its screenshot, and keeps the device log at hand. The agent can then find out *why* something failed, fix the code, and run the same steps again.
 
-> **Status: early (0.1).** The browser actor, scenarios, reports and the MCP server are tested end to end. The phone actor is unit tested against a simulated adb and still needs checking on more real devices. If the guard misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
+> **Status: early (0.1).** The browser actor, scenarios, reports and the MCP server are tested end to end. The phone actor is unit tested against a simulated adb and has not yet been run against a range of real devices. If the guard misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
 
 ## Contents
 
@@ -47,7 +47,7 @@ You need Node 22.12 or newer, [pnpm](https://pnpm.io), Google Chrome, and for th
 git clone https://github.com/AdityaSingh-byte/duet.git
 cd duet
 pnpm install          # also builds dist/
-pnpm link --global    # puts `duet` on your PATH (or run node bin/duet.js)
+npm link              # puts `duet` on your PATH (or run node bin/duet.js)
 duet --help
 ```
 
@@ -76,11 +76,14 @@ duet phone install app-release.apk --resign    # re-sign with the debug key, kee
 
 ### Browser
 
+This uses the host page from the [sample](sample), so start its server first: `cd sample/server && npm install && npm start`.
+
 ```sh
 duet browser open host http://localhost:8080 --capture-title "Slides"
-duet browser new-tab host --title "Slides" --text "Slide 1"
-duet browser click host --text "Present your screen"
-duet browser wait-for host --text "Presenting"
+duet browser new-tab host --title "Slides" --text "Slide 1"    # the tab to share
+duet browser click host --text "Join room"
+duet browser click host --text "Present your screen"           # shares the "Slides" tab, no picker
+duet browser wait-for host --text "Presenting a browser tab"
 duet browser screenshot host
 duet browser close host
 ```
