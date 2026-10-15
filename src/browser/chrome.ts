@@ -57,6 +57,11 @@ export function chromeArgs(o: ChromeLaunchOptions): string[] {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-search-engine-choice-screen',
+    // A test actor keeps full speed while its window sits behind others (the person is watching
+    // the phone). Otherwise Chrome treats the occluded window as hidden and runs timers once a second.
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling',
     `--window-size=${w},${h}`,
   ];
   if (o.windowPosition) args.push(`--window-position=${o.windowPosition[0]},${o.windowPosition[1]}`);
