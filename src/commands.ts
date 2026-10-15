@@ -15,6 +15,7 @@ Usage: duet phone <command> [options]
        duet scenario run FILE [--keep-open] [--runs-dir D]
        duet scenario check FILE
        duet report [RUN_DIR] [--inline] [--out FILE]
+       duet mcp                      serve every command as MCP tools over stdio
 
 PHONE
 

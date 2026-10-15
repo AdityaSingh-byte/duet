@@ -25,6 +25,11 @@ export async function main(argv: string[]): Promise<void> {
       process.stdout.write(HELP + '\n');
       return;
     }
+    if (group === 'mcp') {
+      const { startMcpServer } = await import('./mcp.js');
+      await startMcpServer();
+      return;
+    }
     const { values, positionals } = parse(rest);
     if (values.help || (!positionals[0] && group !== 'report')) {
       process.stdout.write(HELP + '\n');
