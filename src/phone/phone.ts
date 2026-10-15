@@ -21,6 +21,8 @@ import {
 import { center, findByText, parseUiDump, summarize, type FindOptions, type UiNode } from './ui.js';
 
 export interface PhoneOptions {
+  /** Actor name in the run record. Default "phone". */
+  name?: string;
   serial?: string;
   /** Packages under test; taps and typing only happen while one of them is in front. */
   packages?: string[];
@@ -70,6 +72,7 @@ export class Phone {
   readonly adb: Adb;
   readonly run: RunDir;
   readonly policy: GuardPolicy;
+  readonly name: string;
   private readonly noGuard: boolean;
   private readonly maxEdge: number;
   private readonly settleMs: number;
@@ -80,6 +83,7 @@ export class Phone {
     this.adb = adb;
     this.run = opts.run ?? RunDir.fromEnv();
     this.policy = { packages: opts.packages ?? [] };
+    this.name = opts.name ?? 'phone';
     this.noGuard = opts.noGuard ?? false;
     this.maxEdge = opts.maxEdge ?? 1568;
     this.settleMs = opts.settleMs ?? 600;
@@ -144,7 +148,7 @@ export class Phone {
       const raw = await this.adb.execOut(['screencap', '-p']);
       const device = pngSize(raw);
       const scaled = downscalePng(raw, opts.maxEdge ?? this.maxEdge);
-      const path = this.run.nextPath('shots', 'phone', opts.label, 'png');
+      const path = this.run.nextPath('shots', this.name, opts.label, 'png');
       this.run.write(path, scaled.png);
       const shot: Shot = {
         path,
@@ -388,7 +392,7 @@ export class Phone {
       const res = await this.adb.raw(['logcat', ...args], { timeoutMs: 60_000 });
       if (res.code !== 0) throw this.adb.failure('adb logcat', res);
       const text = res.stdout.toString('utf8');
-      const path = this.run.nextPath('logs', 'phone', opts.label ?? 'logcat', 'txt');
+      const path = this.run.nextPath('logs', this.name, opts.label ?? 'logcat', 'txt');
       this.run.write(path, text);
       const all = text.split('\n').filter((l) => l && !l.startsWith('--------- beginning of'));
       const re = opts.grep ? new RegExp(opts.grep, 'i') : null;
@@ -456,7 +460,7 @@ export class Phone {
   }
 
   private step<T>(action: string, args: Record<string, unknown>, fn: () => Promise<{ result: T; shot?: string; log?: string }>): Promise<T> {
-    return this.run.step('phone', action, args, fn);
+    return this.run.step(this.name, action, args, fn);
   }
 }
 

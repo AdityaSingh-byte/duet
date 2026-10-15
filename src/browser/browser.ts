@@ -278,9 +278,13 @@ export class BrowserActor {
   }
 
   /** Evaluates a JavaScript expression in the page and returns its JSON value. */
-  async evaluate(expression: string) {
-    return this.step('eval', { expression: expression.slice(0, 200) }, async () => {
+  async evaluate(expression: string, expect?: string) {
+    return this.step('eval', { expression: expression.slice(0, 200), expect }, async () => {
       const value: unknown = await this.page.evaluate(expression);
+      if (expect !== undefined) {
+        const got = typeof value === 'string' ? value : JSON.stringify(value);
+        if (got !== expect) throw new DuetError(`Expected ${JSON.stringify(expect)}, got ${JSON.stringify(got)}.`, 'failed', { value });
+      }
       return { result: { value } };
     });
   }

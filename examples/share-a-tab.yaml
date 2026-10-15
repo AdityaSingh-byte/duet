@@ -1,0 +1,20 @@
+# One browser actor joins a test room with a fake camera and shares a tab chosen by its title.
+# Run: duet scenario run examples/share-a-tab.yaml
+name: Host shares a slides tab
+actors:
+  host:
+    browser:
+      url: file://${SCENARIO_DIR}/web/room.html
+      fakeMedia: true
+      captureTitle: Slides for the test
+      size: 1000x760
+steps: |
+  host: new-tab --title "Slides for the test" --text "Slide 1: the shared screen"
+  host: fill --field "Your name" --value "Host one"
+  host: click --text Join
+  host: wait-for --text "Joined as Host one"
+  host: click --text "Share screen" --say "present the slides tab"
+  host: wait-for --text "Sharing:"
+  # the shared track must be a tab (web-contents), not the fake screen test pattern
+  host: eval "document.querySelector('video').srcObject.getVideoTracks()[0].label.startsWith('web-contents')" --expect true
+  host: screenshot --label sharing
