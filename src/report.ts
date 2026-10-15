@@ -117,6 +117,9 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
 
   const rows = groups
     .map((g, i) => {
+      if (g.step?.source.startsWith('note: ') && !g.events.length) {
+        return `<li class="note">${esc(g.step.source.slice(6))}</li>`;
+      }
       const failed = g.events.find((e) => !e.ok);
       const shots = g.events.filter((e) => e.shot);
       const logs = g.events.filter((e) => e.action === 'logs' && e.ok);
@@ -176,6 +179,7 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
   a { color: var(--link); }
   ol.steps { list-style: none; margin: 24px 0 0; padding: 0; border-top: 1px solid var(--line); }
   .step { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .note { padding: 24px 0 8px 32px; font-weight: 600; border-bottom: 1px solid var(--line); }
   .step.is-failed { background: var(--fail-bg); margin: 0 -12px; padding: 12px; }
   .head { display: flex; gap: 12px; align-items: baseline; }
   .num { color: var(--muted); min-width: 20px; text-align: right; font-variant-numeric: tabular-nums; }

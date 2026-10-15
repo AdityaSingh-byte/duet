@@ -218,17 +218,45 @@ export class Phone {
   }
 
   async rotation(): Promise<{ rotation: Rotation; degrees: number; landscape: boolean }> {
-    return this.step('rotation', {}, async () => {
-      const [win, size] = await Promise.all([
-        this.adb.shellRaw(`dumpsys window | grep -E 'mRotation=|mCurrentRotation='`, { allowFail: true }),
-        this.adb.shell(['wm', 'size']),
-      ]);
-      const rotation = parseRotation(win);
-      if (rotation === null) throw new DuetError('Could not read the display rotation from dumpsys window.', 'failed');
-      const phys = parseWmSize(size)?.physical;
-      const naturalPortrait = phys ? phys[1] >= phys[0] : true;
-      const landscape = (rotation % 2 === 1) === naturalPortrait;
-      return { result: { rotation, degrees: rotation * 90, landscape } };
+    return this.step('rotation', {}, async () => ({ result: await this.readRotation() }));
+  }
+
+  private async readRotation(): Promise<{ rotation: Rotation; degrees: number; landscape: boolean }> {
+    const [win, size] = await Promise.all([
+      this.adb.shellRaw(`dumpsys window | grep -E 'mRotation=|mCurrentRotation='`, { allowFail: true }),
+      this.adb.shell(['wm', 'size']),
+    ]);
+    const rotation = parseRotation(win);
+    if (rotation === null) throw new DuetError('Could not read the display rotation from dumpsys window.', 'failed');
+    const phys = parseWmSize(size)?.physical;
+    const naturalPortrait = phys ? phys[1] >= phys[0] : true;
+    return { rotation, degrees: rotation * 90, landscape: (rotation % 2 === 1) === naturalPortrait };
+  }
+
+  /**
+   * Polls the rotation until it matches, for checks like "the phone turned sideways".
+   * Fails with the last reading after the timeout.
+   */
+  async expectRotation(want: 'landscape' | 'portrait', timeoutMs = 0): Promise<{ rotation: Rotation; degrees: number; landscape: boolean; ms: number }> {
+    return this.step('rotation', { expect: want, timeoutMs }, async () => {
+      const started = Date.now();
+      for (;;) {
+        const r = await this.readRotation();
+        if ((want === 'landscape') === r.landscape) return { result: { ...r, ms: Date.now() - started } };
+        if (Date.now() - started >= timeoutMs) {
+          throw new DuetError(`Expected ${want}, but the phone is ${r.landscape ? 'landscape' : 'portrait'} (${r.degrees} degrees).`, 'failed', r);
+        }
+        await pause(250);
+      }
+    });
+  }
+
+  /** Lets the phone reach a port on this computer as localhost (adb reverse). Touches nothing on screen. */
+  async reverse(port: number, devicePort = port): Promise<{ device: string; host: string }> {
+    return this.step('reverse', { port, devicePort }, async () => {
+      const res = await this.adb.raw(['reverse', `tcp:${devicePort}`, `tcp:${port}`]);
+      if (res.code !== 0) throw this.adb.failure('adb reverse', res);
+      return { result: { device: `localhost:${devicePort}`, host: `localhost:${port}` } };
     });
   }
 

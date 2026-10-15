@@ -32,3 +32,15 @@ describe('buildReport', () => {
     expect(html).toContain('tap &quot;Join&quot; at 540,2166');
   });
 });
+
+describe('notes', () => {
+  it('render as section headings, not as steps', () => {
+    const run = new RunDir(mkdtempSync(join(tmpdir(), 'duet-rep-')));
+    run.record({ actor: 'scenario', action: 'step', ok: true, args: { index: 1, source: 'note: The host <joins>' } });
+    run.record({ actor: 'scenario', action: 'step', ok: true, args: { index: 2, source: 'host: click --text Join' } });
+    run.record({ actor: 'host', action: 'click', ok: true, args: { text: 'Join' }, result: { clicked: 'Join' } });
+    const html = readFileSync(buildReport(run.dir), 'utf8');
+    expect(html).toContain('<li class="note">The host &lt;joins&gt;</li>');
+    expect(html).toContain('<code>host: click --text Join</code>');
+  });
+});

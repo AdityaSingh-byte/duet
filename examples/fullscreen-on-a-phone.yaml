@@ -1,0 +1,43 @@
+# The two-actor demo: a host presents a tab from a browser, a viewer watches on a real phone
+# and makes it full screen. On the demo/rotation-bug branch of the sample app this fails:
+# full screen closes itself the moment the phone turns sideways.
+#
+#   cd sample/server && npm start           # the relay, on :8080
+#   duet scenario run examples/fullscreen-on-a-phone.yaml
+name: Full screen survives turning the phone sideways
+actors:
+  host:
+    browser:
+      url: ${SAMPLE_URL:-http://localhost:8080}
+      captureTitle: Slides for the phone
+      size: 1000x800
+  viewer:
+    phone:
+      package: dev.duet.sample
+steps: |
+  note: The host joins the room and presents a slides tab
+  host: new-tab --title "Slides for the phone" --text "Slide 1: what we are testing"
+  host: click --text "Join room"
+  host: click --text "Present your screen" --say "present the slides tab"
+  host: wait-for --text "Presenting a browser tab"
+
+  note: The viewer opens the room link on the phone and joins
+  viewer: reverse 8080
+  viewer: open-link "duetsample://room/demo"
+  viewer: tap --text "Join demo"
+  viewer: wait-for --text "Full screen" --timeout 15000
+  viewer: screenshot --label stage
+
+  note: Full screen should turn the phone sideways and stay there
+  viewer: logs mark
+  viewer: tap --text "Full screen"
+  viewer: rotation --expect landscape --timeout 3000
+  pause: 1500
+  viewer: rotation --expect landscape
+  viewer: screenshot --label full-screen
+
+  note: Back returns to the room in portrait, and the session keeps running
+  viewer: back
+  viewer: rotation --expect portrait --timeout 3000
+  viewer: wait-for --text "Full screen"
+  viewer: logs --since-mark --grep "duet-sample"

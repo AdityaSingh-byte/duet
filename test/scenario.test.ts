@@ -80,3 +80,12 @@ describe('loadScenario', () => {
     expect(() => loadScenario(file('h.yaml', `actors:\n  x: {}\nsteps: |\n  x: launch\n`))).toThrow(/exactly one of/);
   });
 });
+
+describe('variable fallbacks', () => {
+  it('${NAME:-fallback} uses the fallback only when the variable is unset', () => {
+    const p = file('i.yaml', `actors:\n  host:\n    browser:\n      url: \${APP_URL:-http://localhost:8080}\nsteps: |\n  host: goto \${APP_URL:-http://localhost:8080}/x\n`);
+    expect(loadScenario(p).actors.host!.browser!.url).toBe('http://localhost:8080');
+    process.env.APP_URL = 'http://other';
+    expect(loadScenario(p).actors.host!.browser!.url).toBe('http://other');
+  });
+});

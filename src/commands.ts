@@ -26,8 +26,8 @@ Look
                                 save a screenshot sized for the model; prints its scale
   ui [--all]                    elements on screen: label, type, centre, flags
   wait-for --text T [--gone]    wait until an element appears (or disappears)
-  rotation [--expect landscape|portrait]
-                                display rotation; with --expect, fail unless it matches
+  rotation [--expect landscape|portrait] [--timeout MS]
+                                display rotation; with --expect, wait up to MS for it, else fail
   logs mark                     remember "now" on the device clock
   logs [--since-mark] [--grep RE] [--app] [--max N]
                                 read logcat without clearing it
@@ -43,6 +43,7 @@ Act (only while your app is in front)
 Launch (from the home screen or your app)
   open-link URI [--package P]   deep link or web link
   launch [--package P]
+  reverse PORT[:DEVICE_PORT]    let the phone reach this computer's PORT as localhost
   install APK [--resign] [--ks PATH] [--ks-pass SPEC] [--key-pass SPEC] [--alias A] [--downgrade]
 
 Phone options
@@ -194,7 +195,7 @@ export interface CommandContext {
 // ---- phone --------------------------------------------------------------------
 
 const PHONE_COMMANDS = new Set([
-  'devices', 'status', 'screenshot', 'ui', 'wait-for', 'rotation', 'tap', 'swipe', 'type', 'key', 'back', 'open-link', 'launch', 'logs', 'install',
+  'devices', 'status', 'screenshot', 'ui', 'wait-for', 'rotation', 'reverse', 'tap', 'swipe', 'type', 'key', 'back', 'open-link', 'launch', 'logs', 'install',
 ]);
 
 export async function phoneCommand(o: Values, positionals: string[], ctx: CommandContext): Promise<Record<string, unknown>> {
@@ -227,11 +228,13 @@ export async function phoneCommand(o: Values, positionals: string[], ctx: Comman
         ...(await phone.waitFor({ text: need(o.text, '--text'), gone: o.gone, exact: o.exact, regex: o.regex, timeoutMs: num(o.timeout, '--timeout') })),
       };
     case 'rotation': {
-      const r = await phone.rotation();
-      if (o.expect && o.expect !== (r.landscape ? 'landscape' : 'portrait')) {
-        throw new DuetError(`Expected ${o.expect}, but the phone is ${r.landscape ? 'landscape' : 'portrait'} (${r.degrees} degrees).`, 'failed', r);
-      }
-      return { ...r };
+      if (!o.expect) return { ...(await phone.rotation()) };
+      if (o.expect !== 'landscape' && o.expect !== 'portrait') throw new DuetError('--expect is landscape or portrait.', 'usage');
+      return { ...(await phone.expectRotation(o.expect, num(o.timeout, '--timeout'))) };
+    }
+    case 'reverse': {
+      const [host, device] = need(pos[0], 'PORT').split(':');
+      return { ...(await phone.reverse(num(host, 'PORT')!, num(device, 'device port'))) };
     }
     case 'tap': {
       if (o.text) return { ...(await phone.tap({ text: o.text, exact: o.exact, regex: o.regex, index: num(o.index, '--index') }, { shot, label: o.label })) };

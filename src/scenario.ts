@@ -39,10 +39,13 @@ export type Step =
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
 
-/** Replaces ${NAME} with an environment variable (or SCENARIO_DIR). An unset variable is an error, not an empty string. */
+/**
+ * Replaces ${NAME} with an environment variable (or SCENARIO_DIR), and ${NAME:-fallback} with the
+ * variable or the fallback. An unset variable without a fallback is an error, not an empty string.
+ */
 function interpolate(text: string, vars: Record<string, string | undefined>, where: string): string {
-  return text.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_, name: string) => {
-    const v = vars[name];
+  return text.replace(/\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}/g, (_, name: string, fallback: string | undefined) => {
+    const v = vars[name] ?? fallback;
     if (v === undefined) throw new DuetError(`${where}: \${${name}} is not set.`, 'usage');
     return v;
   });

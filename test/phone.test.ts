@@ -169,3 +169,25 @@ describe('Phone', () => {
     expect(events[0]!.shot).toBe('shots/001-phone.png');
   });
 });
+
+describe('Phone rotation and reverse', () => {
+  it('expectRotation waits for the orientation and records one step', async () => {
+    const dev = { ...base };
+    const { phone } = phoneFor(dev);
+    setTimeout(() => (dev.rotation = 1), 300);
+    const r = await phone.expectRotation('landscape', 3000);
+    expect(r).toMatchObject({ rotation: 1, degrees: 90, landscape: true });
+    expect(new RunDir(dir).events().filter((e) => e.action === 'rotation')).toHaveLength(1);
+  });
+
+  it('expectRotation fails with the reading when it never matches', async () => {
+    const { phone } = phoneFor(base);
+    await expect(phone.expectRotation('landscape', 0)).rejects.toThrow('Expected landscape, but the phone is portrait (0 degrees).');
+  });
+
+  it('reverse maps a device port to this computer', async () => {
+    const { phone, calls } = phoneFor(base);
+    await phone.reverse(8080);
+    expect(calls).toContain('reverse tcp:8080 tcp:8080');
+  });
+});

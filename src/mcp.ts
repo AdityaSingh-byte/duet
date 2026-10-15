@@ -219,8 +219,17 @@ export async function startMcpServer(): Promise<void> {
 
   server.registerTool(
     'phone_rotation',
-    { description: 'Display rotation (0-3), degrees, and whether the phone is in landscape.' },
-    async () => respond(async () => (await getPhone()).rotation()),
+    {
+      description: 'Display rotation (0-3), degrees, and whether the phone is in landscape. With `expect`, wait up to timeoutMs for that orientation, else fail.',
+      inputSchema: { expect: z.enum(['landscape', 'portrait']).optional(), timeoutMs },
+    },
+    async (a) => respond(async () => (a.expect ? (await getPhone()).expectRotation(a.expect, a.timeoutMs) : (await getPhone()).rotation())),
+  );
+
+  server.registerTool(
+    'phone_reverse',
+    { description: "Let the phone reach a port on this computer as localhost (adb reverse), e.g. a dev server.", inputSchema: { port: z.number().int(), devicePort: z.number().int().optional() } },
+    async (a) => respond(async () => (await getPhone()).reverse(a.port, a.devicePort)),
   );
 
   server.registerTool(
