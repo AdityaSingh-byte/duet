@@ -16,6 +16,16 @@ export function Room({ server, room, onLeave }: Props) {
   const { frame, people, connection } = useRoom(server, room, 'Phone viewer');
   const { width } = useWindowDimensions();
   const twoPane = width >= 600;
+  // Full screen lives here, not in Stage: turning the phone sideways switches to two panes,
+  // which remounts Stage, and state kept inside it would be lost (full screen would close itself).
+  const [fullScreen, setFullScreen] = useState(false);
+
+  useEffect(() => {
+    console.log(`[duet-sample] full screen ${fullScreen ? 'open' : 'closed'}`);
+    ScreenOrientation.lockAsync(fullScreen ? ScreenOrientation.OrientationLock.LANDSCAPE : ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, [fullScreen]);
+
+  const stage = <Stage frame={frame} connection={connection} fullScreen={fullScreen} onFullScreen={setFullScreen} />;
 
   const header = (
     <View style={styles.header}>
@@ -33,7 +43,7 @@ export function Room({ server, room, onLeave }: Props) {
       <View style={styles.twoPane}>
         <View style={styles.main}>
           {header}
-          <Stage frame={frame} connection={connection} />
+          {stage}
         </View>
         <View style={styles.side}>
           <People people={people} />
@@ -44,21 +54,20 @@ export function Room({ server, room, onLeave }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.onePane}>
       {header}
-      <Stage frame={frame} connection={connection} />
+      {stage}
       <People people={people} />
     </ScrollView>
   );
 }
 
-function Stage({ frame, connection }: { frame: string | null; connection: string }) {
-  // Whether the shared screen is open full screen.
-  const [fullScreen, setFullScreen] = useState(false);
+interface StageProps {
+  frame: string | null;
+  connection: string;
+  fullScreen: boolean;
+  onFullScreen(open: boolean): void;
+}
 
-  useEffect(() => {
-    console.log(`[duet-sample] full screen ${fullScreen ? 'open' : 'closed'}`);
-    ScreenOrientation.lockAsync(fullScreen ? ScreenOrientation.OrientationLock.LANDSCAPE : ScreenOrientation.OrientationLock.PORTRAIT_UP);
-  }, [fullScreen]);
-
+function Stage({ frame, connection, fullScreen, onFullScreen: setFullScreen }: StageProps) {
   useEffect(() => {
     console.log('[duet-sample] stage mounted');
     return () => console.log('[duet-sample] stage unmounted');
