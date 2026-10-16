@@ -5,7 +5,9 @@ import {
   parseKeyguard,
   parsePids,
   parseResolvedPackage,
+  parseInjectionFailure,
   parseRotation,
+  parseStuckPointers,
   parseTopActivity,
   parseWakefulness,
   parseWmSize,
@@ -119,5 +121,26 @@ describe('parseRotation on a real Android 16 dump (Samsung)', () => {
   });
   it('ignores snapshot lines entirely', () => {
     expect(parseRotation('     snapshot=TaskSnapshot{ mOrientation=1 mRotation=1 }')).toBeNull();
+  });
+});
+
+describe('injected-input rejections (real Android 16 lines)', () => {
+  const down =
+    'E/InputDispatcher(10136): Inconsistent event: MotionEvent { action=DOWN, id[0]=0, x[0]=540, y[0]=810, deviceId=5, source=TOUCHSCREEN, displayId=0}, reason: Injection on 0: Invalid DOWN event - pointers already down for device DeviceId(-1): {DeviceId(-1): {2}}\nW/InputManager(10136): Input event injection from pid 11067 failed.';
+  const cancelStuck = 'reason: Injection on 0: Got ACTION_CANCEL, but the pointers don\'t match. Existing pointers: {DeviceId(-1): {2}}';
+  const cancelClean = 'reason: Injection on 0: Got ACTION_CANCEL, but the pointers don\'t match. Existing pointers: {}';
+
+  it('finds the pointer another tool left pressed', () => {
+    expect(parseStuckPointers(down)).toEqual({ '-1': [2] });
+    expect(parseStuckPointers(cancelStuck)).toEqual({ '-1': [2] });
+    expect(parseStuckPointers('Existing pointers: {DeviceId(-1): {2, 3}, DeviceId(5): {0}}')).toEqual({ '-1': [2, 3], '5': [0] });
+  });
+  it('an empty set means nothing is stuck; no mention means unknown', () => {
+    expect(parseStuckPointers(cancelClean)).toEqual({});
+    expect(parseStuckPointers('nothing here')).toBeNull();
+  });
+  it('reads the rejection reason, or nothing when the event went through', () => {
+    expect(parseInjectionFailure(down)).toBe('Injection on 0: Invalid DOWN event - pointers already down for device DeviceId(-1): {DeviceId(-1): {2}}');
+    expect(parseInjectionFailure('')).toBeNull();
   });
 });

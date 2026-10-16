@@ -19,6 +19,8 @@ interface FakeDevice {
   rotation: 0 | 1 | 2 | 3;
   screen: [number, number];
   installResult?: string;
+  /** A pointer another tool left pressed: Android rejects injected input until it is released. */
+  stuckPointer?: number;
 }
 
 /** A pretend phone: answers the adb commands duet sends, and records them. */
@@ -43,6 +45,19 @@ function fakeAdb(dev: FakeDevice) {
     if (line === 'exec-out screencap -p') {
       const [w, h] = dev.rotation % 2 ? [dev.screen[1], dev.screen[0]] : dev.screen;
       return ok(solidPng(w, h, [240, 240, 240]));
+    }
+    if (line.includes('input motionevent CANCEL')) {
+      const pointers = dev.stuckPointer === undefined ? '{}' : `{DeviceId(-1): {${dev.stuckPointer}}}`;
+      return ok(`E/InputDispatcher(1): Inconsistent event: MotionEvent { action=CANCEL }, reason: Injection on 0: Got ACTION_CANCEL, but the pointers don't match. Existing pointers: ${pointers}\n`);
+    }
+    if (line.includes('app_process / Unstick')) {
+      dev.stuckPointer = undefined;
+      return ok('injected\n');
+    }
+    if (line.includes('; input ') && dev.stuckPointer !== undefined) {
+      return ok(
+        `E/InputDispatcher(1): Inconsistent event: MotionEvent { action=DOWN }, reason: Injection on 0: Invalid DOWN event - pointers already down for device DeviceId(-1): {DeviceId(-1): {${dev.stuckPointer}}}\nW/InputManager(1): Input event injection from pid 42 failed.\n`,
+      );
     }
     if (line.startsWith('shell uiautomator dump')) return ok('UI hierchary dumped to: /data/local/tmp/duet-ui.xml\n');
     if (line.startsWith('exec-out cat')) return ok(uiXml);
@@ -82,7 +97,7 @@ describe('Phone', () => {
     await phone.screenshot();
     const r = await phone.tap({ x: 362, y: 1452 });
     expect(r).toMatchObject({ x: 540, y: 2166 });
-    expect(calls).toContain('shell input tap 540 2166');
+    expect(calls.some((c) => c.includes('input tap 540 2166'))).toBe(true);
   });
 
   it('tap X Y: refuses after the screen rotated since the screenshot', async () => {
@@ -91,14 +106,14 @@ describe('Phone', () => {
     await phone.screenshot();
     dev.rotation = 1;
     await expect(phone.tap({ x: 10, y: 10 })).rejects.toThrow(/rotated since the last screenshot/);
-    expect(calls.some((c) => c.startsWith('shell input'))).toBe(false);
+    expect(calls.some((c) => c.includes('input tap'))).toBe(false);
   });
 
   it('tap --text: taps the centre of the best match', async () => {
     const { phone, calls } = phoneFor(base);
     const r = await phone.tap({ text: 'Join room' });
     expect(r).toMatchObject({ x: 540, y: 2166, matched: 'Join room', candidates: 2 });
-    expect(calls).toContain('shell input tap 540 2166');
+    expect(calls.some((c) => c.includes('input tap 540 2166'))).toBe(true);
   });
 
   it('tap --text: a miss lists what is on screen', async () => {
@@ -113,7 +128,7 @@ describe('Phone', () => {
     const { phone, calls } = phoneFor({ ...base, foreground: 'com.example.game' });
     const err = await phone.tap({ x: 1, y: 1, space: 'device' }).catch((e: DuetError) => e);
     expect((err as DuetError).code).toBe('guard');
-    expect(calls.some((c) => c.startsWith('shell input'))).toBe(false);
+    expect(calls.some((c) => c.includes('input tap'))).toBe(false);
   });
 
   it('the guard stops a screenshot while the phone is locked', async () => {
@@ -131,7 +146,7 @@ describe('Phone', () => {
   it('type: escapes spaces for input text and rejects non-ASCII', async () => {
     const { phone, calls } = phoneFor(base);
     await phone.type("it's me");
-    expect(calls).toContain(`shell input text 'it'\\''s%sme'`);
+    expect(calls.some((c) => c.includes(`input text 'it'\\''s%sme'`))).toBe(true);
     await expect(phone.type('नमस्ते')).rejects.toThrow(/ASCII/);
   });
 
@@ -189,5 +204,30 @@ describe('Phone rotation and reverse', () => {
     const { phone, calls } = phoneFor(base);
     await phone.reverse(8080);
     expect(calls).toContain('reverse tcp:8080 tcp:8080');
+  });
+});
+
+describe('Phone injected input', () => {
+  it('a tap Android rejects is a failure with the reason, not ok', async () => {
+    const { phone } = phoneFor({ ...base, stuckPointer: 2 });
+    const err = (await phone.tap({ x: 540, y: 810, space: 'device' }).catch((e: DuetError) => e)) as DuetError;
+    expect(err).toBeInstanceOf(DuetError);
+    expect(err.message).toContain('pointers already down');
+    expect(err.message).toContain('duet phone unstick');
+    expect(err.details?.stuck).toEqual({ '-1': [2] });
+  });
+
+  it('unstick releases exactly the stuck pointer, then taps go through', async () => {
+    const dev: FakeDevice = { ...base, stuckPointer: 2 };
+    const { phone, calls } = phoneFor(dev);
+    expect(await phone.unstick()).toEqual({ stuck: { '-1': [2] }, released: true });
+    expect(calls.some((c) => c.includes('app_process / Unstick -1 2'))).toBe(true);
+    await expect(phone.tap({ x: 540, y: 810, space: 'device' })).resolves.toMatchObject({ x: 540, y: 810 });
+  });
+
+  it('unstick does nothing when nothing is stuck', async () => {
+    const { phone, calls } = phoneFor(base);
+    expect(await phone.unstick()).toEqual({ stuck: {}, released: true });
+    expect(calls.some((c) => c.includes('app_process'))).toBe(false);
   });
 });

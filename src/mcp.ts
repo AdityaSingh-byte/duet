@@ -227,6 +227,15 @@ export async function startMcpServer(): Promise<void> {
   );
 
   server.registerTool(
+    'phone_unstick',
+    {
+      description:
+        'Release injected touches another tool left pressed. Use when taps fail with "Android rejected the injected input" and a stuck pointer; until released, Android rejects every injected tap.',
+    },
+    async () => respond(async () => (await getPhone()).unstick()),
+  );
+
+  server.registerTool(
     'phone_reverse',
     { description: "Let the phone reach a port on this computer as localhost (adb reverse), e.g. a dev server.", inputSchema: { port: z.number().int(), devicePort: z.number().int().optional() } },
     async (a) => respond(async () => (await getPhone()).reverse(a.port, a.devicePort)),

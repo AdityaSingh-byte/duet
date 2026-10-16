@@ -44,6 +44,7 @@ Launch (from the home screen or your app)
   open-link URI [--package P]   deep link or web link
   launch [--package P]
   reverse PORT[:DEVICE_PORT]    let the phone reach this computer's PORT as localhost
+  unstick                       release touches another tool left pressed (when every tap is rejected)
   install APK [--resign] [--ks PATH] [--ks-pass SPEC] [--key-pass SPEC] [--alias A] [--downgrade]
 
 Phone options
@@ -195,7 +196,7 @@ export interface CommandContext {
 // ---- phone --------------------------------------------------------------------
 
 export const PHONE_COMMANDS = new Set([
-  'devices', 'status', 'screenshot', 'ui', 'wait-for', 'rotation', 'reverse', 'tap', 'swipe', 'type', 'key', 'back', 'open-link', 'launch', 'logs', 'install',
+  'devices', 'status', 'screenshot', 'ui', 'wait-for', 'rotation', 'reverse', 'unstick', 'tap', 'swipe', 'type', 'key', 'back', 'open-link', 'launch', 'logs', 'install',
 ]);
 
 export async function phoneCommand(o: Values, positionals: string[], ctx: CommandContext): Promise<Record<string, unknown>> {
@@ -232,6 +233,8 @@ export async function phoneCommand(o: Values, positionals: string[], ctx: Comman
       if (o.expect !== 'landscape' && o.expect !== 'portrait') throw new DuetError('--expect is landscape or portrait.', 'usage');
       return { ...(await phone.expectRotation(o.expect, num(o.timeout, '--timeout'))) };
     }
+    case 'unstick':
+      return { ...(await phone.unstick()) };
     case 'reverse': {
       const [host, device] = need(pos[0], 'PORT').split(':');
       return { ...(await phone.reverse(num(host, 'PORT')!, num(device, 'device port'))) };

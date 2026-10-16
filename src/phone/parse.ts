@@ -151,3 +151,29 @@ export function parsePids(out: string): number[] {
     .filter((p) => /^\d+$/.test(p))
     .map(Number);
 }
+
+/** Injected touch pointers Android thinks are still down, by device id. */
+export type StuckPointers = Record<string, number[]>;
+
+/**
+ * From the input dispatcher's rejection lines, e.g.
+ * `reason: Injection on 0: Got ACTION_CANCEL, but the pointers don't match. Existing pointers: {DeviceId(-1): {2}}`
+ * or `Invalid DOWN event - pointers already down for device DeviceId(-1): {DeviceId(-1): {2}}`.
+ * Returns null when the output says nothing about existing pointers.
+ */
+export function parseStuckPointers(out: string): StuckPointers | null {
+  const m = /(?:Existing pointers|Touching pointers|pointers already down for device[^:]*):\s*(\{.*\})\s*$/m.exec(out);
+  if (!m) return null;
+  const stuck: StuckPointers = {};
+  for (const d of m[1]!.matchAll(/DeviceId\((-?\d+)\):\s*\{([\d,\s]*)\}/g)) {
+    const ids = d[2]!.split(',').map((x) => x.trim()).filter(Boolean).map(Number);
+    if (ids.length) stuck[d[1]!] = ids;
+  }
+  return stuck;
+}
+
+/** The dispatcher's reason when it rejected an injected event, or null if nothing was rejected. */
+export function parseInjectionFailure(out: string): string | null {
+  if (!/injection from pid \d+ failed|Inconsistent event/.test(out)) return null;
+  return /reason:\s*(.+)$/m.exec(out)?.[1]?.trim() ?? 'Android rejected the injected input event.';
+}

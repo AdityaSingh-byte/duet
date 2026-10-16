@@ -5,18 +5,21 @@ import { RunDir } from '../run.js';
 import { DuetError } from '../util/errors.js';
 import { run as defaultRunner, type Runner } from '../util/exec.js';
 import { darkFraction, downscalePng, pngSize } from '../util/png.js';
-import { Adb, resolveSerial } from './adb.js';
+import { Adb, resolveSerial, shQuote } from './adb.js';
 import { evaluateGuard, type ActionKind, type GuardPolicy, type GuardVerdict, type PhoneStatus } from './guard.js';
 import {
   parseFocus,
   parseKeyguard,
+  parseInjectionFailure,
   parsePids,
   parseResolvedPackage,
   parseRotation,
   parseTopActivity,
   parseWakefulness,
+  parseStuckPointers,
   parseWmSize,
   type Rotation,
+  type StuckPointers,
 } from './parse.js';
 import { center, findByText, parseUiDump, summarize, type FindOptions, type UiNode } from './ui.js';
 
@@ -65,6 +68,7 @@ export interface ResignOptions {
 
 const WINDOW_FIELDS = 'isKeyguardShowing|KeyguardShowing|mShowingLockscreen|mDreamingLockscreen|isStatusBarKeyguard|mCurrentFocus=|mRotation=|mCurrentRotation=|mGlobalConfiguration=';
 const DUMP_PATH = '/data/local/tmp/duet-ui.xml';
+const UNSTICK_PATH = '/data/local/tmp/duet-unstick.dex';
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One Android device, driven over adb, with every step recorded to the run folder. */
@@ -286,7 +290,7 @@ export class Phone {
       } else {
         point = this.toDevice(target, status.rotation);
       }
-      await this.adb.shell(['input', 'tap', String(point.x), String(point.y)]);
+      await this.inject(['tap', String(point.x), String(point.y)]);
       const result: { x: number; y: number; matched?: string; candidates?: number; shot?: Shot } = { ...point, matched, candidates };
       if (opts.shot) result.shot = await this.settleAndShoot(opts.label ?? 'after-tap');
       return { result };
@@ -298,7 +302,7 @@ export class Phone {
       const status = await this.ensureSafe('act', 'swipe');
       const a = this.toDevice({ ...from, space: opts.space }, status.rotation);
       const b = this.toDevice({ ...to, space: opts.space }, status.rotation);
-      await this.adb.shell(['input', 'swipe', String(a.x), String(a.y), String(b.x), String(b.y), String(opts.ms ?? 300)]);
+      await this.inject(['swipe', String(a.x), String(a.y), String(b.x), String(b.y), String(opts.ms ?? 300)]);
       const result: { from: typeof a; to: typeof b; shot?: Shot } = { from: a, to: b };
       if (opts.shot) result.shot = await this.settleAndShoot('after-swipe');
       return { result };
@@ -312,7 +316,7 @@ export class Phone {
         throw new DuetError('input text can only type printable ASCII. Paste other text through the app under test instead.', 'usage');
       }
       await this.ensureSafe('act', 'type');
-      await this.adb.shell(['input', 'text', text.replace(/ /g, '%s')]);
+      await this.inject(['text', text.replace(/ /g, '%s')]);
       return { result: { typed: text.length, shot: opts.shot ? await this.settleAndShoot('after-type') : undefined } };
     });
   }
@@ -321,7 +325,7 @@ export class Phone {
     const keycode = /^\d+$/.test(code) || code.startsWith('KEYCODE_') ? code : `KEYCODE_${code.toUpperCase()}`;
     return this.step('key', { keycode }, async () => {
       await this.ensureSafe('act', keycode);
-      await this.adb.shell(['input', 'keyevent', keycode]);
+      await this.inject(['keyevent', keycode]);
       return { result: { keycode, shot: opts.shot ? await this.settleAndShoot(`after-${keycode.toLowerCase()}`) : undefined } };
     });
   }
@@ -358,6 +362,56 @@ export class Phone {
       if (parseResolvedPackage(out) !== pkg) throw new DuetError(`${pkg} is not installed or has no launcher activity.`, 'not-found');
       await this.adb.shell(['am', 'start', '-W', '-n', component]);
       return { result: { launched: component, shot: opts.shot ? await this.settleAndShoot('after-launch') : undefined } };
+    });
+  }
+
+  /**
+   * Runs `adb shell input ...` and, in the same call, reads what the input dispatcher said about it.
+   * `input` exits 0 even when Android rejects the event, so without this a tap that never
+   * happened would be reported as done.
+   */
+  private async inject(args: string[]): Promise<void> {
+    const cmd = `t=$(date +%s.%N | cut -c1-14); input ${args.map(shQuote).join(' ')}; logcat -d -v brief -T "$t" | grep -E 'Inconsistent event|injection from pid [0-9]+ failed'`;
+    const out = await this.adb.shellRaw(cmd, { allowFail: true });
+    const reason = parseInjectionFailure(out);
+    if (!reason) return;
+    const stuck = parseStuckPointers(out);
+    const hint =
+      stuck && Object.keys(stuck).length
+        ? ' Another tool left a touch pressed and never released it. Run "duet phone unstick" to release it, then try again.'
+        : '';
+    throw new DuetError(`Android rejected the injected input (${reason}).${hint}`, 'failed', { stuck });
+  }
+
+  /**
+   * Releases injected touch pointers that another tool pressed and never let go (for example an
+   * automation run killed mid-gesture). Until they are released Android rejects every injected tap.
+   * Sends ACTION_CANCEL for exactly those pointer ids, through a small helper run with app_process.
+   */
+  async unstick(): Promise<{ stuck: StuckPointers; released: boolean }> {
+    return this.step('unstick', {}, async () => {
+      await this.ensureSafe('launch', 'release stuck touches');
+      const probe = async () =>
+        parseStuckPointers(
+          await this.adb.shellRaw(
+            `t=$(date +%s.%N | cut -c1-14); input motionevent CANCEL 1 1; logcat -d -v brief -T "$t" | grep -E 'Existing pointers|pointers already down|Touching pointers'`,
+            { allowFail: true },
+          ),
+        );
+      const stuck = await probe();
+      if (stuck === null) throw new DuetError('Could not read the injected-touch state from the device log on this Android version.', 'failed');
+      if (!Object.keys(stuck).length) return { result: { stuck, released: true } };
+      const dex = new URL('../../assets/duet-unstick.dex', import.meta.url).pathname;
+      if (!existsSync(dex)) throw new DuetError(`${dex} is missing. Build it with scripts/build-unstick.sh.`, 'not-found');
+      const push = await this.adb.raw(['push', dex, UNSTICK_PATH]);
+      if (push.code !== 0) throw this.adb.failure('adb push', push);
+      for (const [device, ids] of Object.entries(stuck)) {
+        await this.adb.shellRaw(`CLASSPATH=${UNSTICK_PATH} app_process / Unstick ${Number(device)} ${ids.map(Number).join(' ')}`);
+      }
+      const after = await probe();
+      const released = !!after && Object.keys(after).length === 0;
+      if (!released) throw new DuetError(`Touches are still stuck after the release: ${JSON.stringify(after)}.`, 'failed', { before: stuck, after });
+      return { result: { stuck, released } };
     });
   }
 
