@@ -476,7 +476,8 @@ export class Phone {
       const text = res.stdout.toString('utf8');
       const path = this.run.nextPath('logs', this.name, opts.label ?? 'logcat', 'txt');
       this.run.write(path, text);
-      const all = text.split('\n').filter((l) => l && !l.startsWith('--------- beginning of'));
+      // adbd logs every shell command it runs, duet's own included; those lines are noise here.
+      const all = text.split('\n').filter((l) => l && !l.startsWith('--------- beginning of') && !/\badbd\s*: adbd service requested/.test(l));
       const re = opts.grep ? new RegExp(opts.grep, 'i') : null;
       const matched = re ? all.filter((l) => re.test(l)) : all;
       const max = opts.max ?? 200;
