@@ -1,0 +1,45 @@
+# Three actors: two browsers waiting to be signed in, and a phone that approves one of them.
+# The phone enters the laptop's code, so only the laptop may be signed in.
+#
+#   cd sample/server && npm start                  # the fixed server
+#   cd sample/server && PAIR_BUG=1 npm start       # with the planted bug: the wrong browser signs in
+#   duet scenario run examples/sign-in-with-phone.yaml
+#
+# The bug passes any test with one browser waiting. It takes two browsers and a phone to see it.
+name: Sign in on the right browser with your phone
+actors:
+  laptop:
+    browser:
+      url: ${SAMPLE_URL:-http://localhost:8080}/pair
+      size: 480x720
+      position: 0,0
+  desktop:
+    browser:
+      url: ${SAMPLE_URL:-http://localhost:8080}/pair
+      size: 480x720
+      position: 500,0
+  phone:
+    phone:
+      package: dev.duet.pair
+steps: |
+  note: Two browsers are waiting to be signed in, each with its own code
+  laptop: wait-for --text "Waiting for your phone"
+  desktop: wait-for --text "Waiting for your phone"
+  laptop: eval "document.querySelector('#code').dataset.code" --save LAPTOP_CODE
+
+  note: On the phone, enter the laptop's code and approve
+  phone: reverse 8080
+  phone: launch --restart
+  phone: tap --text "Code from the computer"
+  phone: type ${LAPTOP_CODE}
+  phone: wait-for --text "${LAPTOP_CODE}"
+  phone: tap --text "Continue" --exact
+  phone: wait-for --text "Sign in to this browser?"
+  phone: tap --text "Approve" --exact
+  phone: wait-for --text "Approved" --exact
+
+  note: Only the laptop is signed in; the desktop is still waiting
+  laptop: wait-for --text "Signed in as Phone owner" --timeout 5000
+  desktop: wait-for --text "Waiting for your phone"
+  desktop: eval "document.querySelector('#done').hidden" --expect true
+  phone: logs --since-mark --grep "duet-pair"

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in with your phone</title>
+<style>
+  :root { --text: #1d1d1f; --muted: #5f6368; --line: #e3e3e3; --field: #f4f4f4; --ok: #1e7b3c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: #fff; }
+  main { max-width: 440px; padding: 48px 24px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  #code { font: 600 44px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.08em; padding: 20px 0; margin: 8px 0 16px; text-align: center; background: var(--field); border-radius: 8px; font-variant-numeric: tabular-nums; }
+  #status { font-size: 14px; color: var(--muted); }
+  .signed-in h1 { color: var(--ok); }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="waiting">
+    <h1>Sign in with your phone</h1>
+    <p>Open the duet pair app on your phone and enter this code.</p>
+    <div id="code" aria-label="Sign-in code">&nbsp;</div>
+    <div id="status">Getting a code</div>
+  </section>
+  <section id="done" class="signed-in" hidden>
+    <h1>Signed in</h1>
+    <p id="who"></p>
+    <button id="out">Sign out</button>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let id, timer;
+
+  async function start() {
+    clearInterval(timer);
+    $('waiting').hidden = false;
+    $('done').hidden = true;
+    const r = await fetch('/api/pair', { method: 'POST' }).then((x) => x.json());
+    id = r.id;
+    $('code').dataset.code = r.code;
+    $('code').textContent = `${r.code.slice(0, 3)} ${r.code.slice(3)}`;
+    $('status').textContent = 'Waiting for your phone';
+    timer = setInterval(poll, 500);
+  }
+
+  async function poll() {
+    const r = await fetch(`/api/pair/${id}`).then((x) => x.json()).catch(() => null);
+    if (!r) return;
+    if (r.status === 'approved') {
+      clearInterval(timer);
+      $('waiting').hidden = true;
+      $('done').hidden = false;
+      $('who').textContent = `Signed in as ${r.name}.`;
+    } else if (r.status === 'expired') {
+      clearInterval(timer);
+      $('status').textContent = 'This code expired. Reload for a new one.';
+    }
+  }
+
+  $('out').onclick = start;
+  start();
+</script>
+</body>
+</html>
