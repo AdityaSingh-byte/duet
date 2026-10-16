@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { findChrome } from './browser/chrome.js';
@@ -112,12 +112,18 @@ async function renderPngs(width: number, header: { html: string }, captions: { h
  * up by the time each recording started, with the current step as a caption and the result at
  * the end. With `gif`, also writes video/run.gif for a README.
  */
-export async function composeRunVideo(runDir: string, opts: { gif?: boolean } = {}): Promise<{ mp4: string; gif?: string; seconds: number }> {
+export async function composeRunVideo(runDir: string, opts: { gif?: boolean; warn?: (msg: string) => void } = {}): Promise<{ mp4: string; gif?: string; seconds: number }> {
   const run = new RunDir(runDir);
   const tracksFile = join(run.dir, 'video', 'tracks.json');
   if (!existsSync(tracksFile)) throw new DuetError(`${runDir} has no recordings. Run the scenario with --record.`, 'not-found');
-  const tracks = (JSON.parse(readFileSync(tracksFile, 'utf8')) as Track[]).filter((t) => existsSync(t.path));
-  if (!tracks.length) throw new DuetError('The recordings listed in tracks.json are missing.', 'not-found');
+  const listed = JSON.parse(readFileSync(tracksFile, 'utf8')) as Track[];
+  // A track with no frames (for example a browser page that never changed) is left out, not fatal.
+  const tracks: Track[] = [];
+  for (const t of listed) {
+    if (existsSync(t.path) && statSync(t.path).size > 0 && (await ffprobeSize(t.path).catch(() => null))) tracks.push(t);
+    else opts.warn?.(`${t.actor}: the recording has no frames, so it is left out of the video`);
+  }
+  if (!tracks.length) throw new DuetError('None of the recordings in tracks.json has any frames.', 'not-found');
   // Browsers first (the presenter), then phones.
   tracks.sort((a, b) => (a.kind === b.kind ? a.startedAt - b.startedAt : a.kind === 'browser' ? -1 : 1));
 

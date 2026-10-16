@@ -20,7 +20,7 @@ export function pageFind(spec: FindSpec): Element | null {
   const FIELD = 'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=checkbox]):not([type=radio]), textarea, select, [contenteditable=""], [contenteditable=true]';
   const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
   const visible = (el: Element) => {
-    if (el.closest(`#__duet_banner`)) return false;
+    if (el.closest('#__duet_banner, #__duet_heartbeat')) return false;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return false;
     const st = getComputedStyle(el);
@@ -85,7 +85,7 @@ export function pageInteractive(limit: number): string[] {
     'button, a[href], [role=button], [role=link], [role=menuitem], [role=tab], [role=checkbox], [role=switch], input:not([type=hidden]), textarea, select, summary';
   const lines: string[] = [];
   for (const el of Array.from(document.querySelectorAll(sel))) {
-    if (el.closest('#__duet_banner')) continue;
+    if (el.closest('#__duet_banner, #__duet_heartbeat')) continue;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
     const st = getComputedStyle(el);

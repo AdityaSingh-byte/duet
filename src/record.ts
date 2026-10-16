@@ -76,6 +76,23 @@ export class BrowserRecorder {
 
   static async start(actor: BrowserActor, run: RunDir): Promise<BrowserRecorder> {
     const path = join(run.dir, 'video', `${actor.name}.webm`) as `${string}.webm`;
+    // Chrome's screencast only sends a frame when the page changes, so a page that sits still
+    // records nothing at all. A 2 px, nearly transparent element that moves once a second keeps
+    // frames coming without changing what anyone sees.
+    const heartbeat = `(() => {
+      const add = () => {
+        if (document.getElementById('__duet_heartbeat')) return;
+        const el = document.createElement('div');
+        el.id = '__duet_heartbeat';
+        el.setAttribute('aria-hidden', 'true');
+        el.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;background:#000;opacity:0.02;pointer-events:none;z-index:2147483647';
+        document.documentElement.appendChild(el);
+        el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-1px)' }], { duration: 1000, iterations: Infinity, direction: 'alternate' });
+      };
+      if (document.documentElement) add(); else document.addEventListener('DOMContentLoaded', add);
+    })()`;
+    await actor.page.evaluateOnNewDocument(heartbeat).catch(() => {});
+    await actor.page.evaluate(heartbeat).catch(() => {});
     try {
       const recorder = await actor.page.screencast({ path });
       return new BrowserRecorder(actor, recorder, path, Date.now());

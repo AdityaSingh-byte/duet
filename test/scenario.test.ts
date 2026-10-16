@@ -114,3 +114,21 @@ describe('runScenario', () => {
     }
   });
 });
+
+describe('values passed between actors (--save)', () => {
+  const two = `actors:\n  web:\n    browser:\n      url: http://localhost:8080\n  phone:\n    phone:\n      package: dev.duet.pair\n`;
+  it('a later step can use a value an earlier eval saved; it is filled in at run time', () => {
+    const sc = loadScenario(file('s1.yaml', `${two}steps: |\n  web: eval "document.querySelector('#code').textContent" --save CODE\n  phone: type \${CODE}\n`));
+    expect(sc.steps[0]).toMatchObject({ saves: 'CODE' });
+    expect(sc.steps[1]).toMatchObject({ argv: ['type', '${CODE}'] });
+  });
+  it('using a value before the step that saves it is an error', () => {
+    expect(() => loadScenario(file('s2.yaml', `${two}steps: |\n  phone: type \${CODE}\n  web: eval "1" --save CODE\n`))).toThrow(
+      /step 1: \$\{CODE\} is used before the step that saves it/,
+    );
+  });
+  it('only browser eval steps can save, with an upper-case name', () => {
+    expect(() => loadScenario(file('s3.yaml', `${two}steps: |\n  phone: ui --save CODE\n`))).toThrow(/--save works with a browser eval step/);
+    expect(() => loadScenario(file('s4.yaml', `${two}steps: |\n  web: eval "1" --save code\n`))).toThrow(/upper-case name/);
+  });
+});

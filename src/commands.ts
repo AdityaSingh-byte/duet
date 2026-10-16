@@ -43,7 +43,7 @@ Act (only while your app is in front)
 
 Launch (from the home screen or your app)
   open-link URI [--package P]   deep link or web link
-  launch [--package P]
+  launch [--package P] [--restart]   --restart stops the app under test first, so it opens fresh
   reverse PORT[:DEVICE_PORT]    let the phone reach this computer's PORT as localhost
   unstick                       release touches another tool left pressed (when every tap is rejected)
   install APK [--resign] [--ks PATH] [--ks-pass SPEC] [--key-pass SPEC] [--alias A] [--downgrade]
@@ -68,7 +68,9 @@ BROWSER (a visible Chrome per name, e.g. host or guest; it stays open between co
   ui NAME                       buttons, links and fields with their labels
   new-tab NAME --title T [--text X | --html H | --url U]
                                 a tab to screen-share with --capture-title T
-  eval NAME EXPR [--expect V]   evaluate JavaScript in the page; with --expect, fail unless it equals V
+  eval NAME EXPR [--expect V] [--save VAR]
+                                evaluate JavaScript in the page; --expect fails unless it equals V;
+                                in a scenario, --save VAR keeps the value for later steps as \${VAR}
   list                          running browsers
   close NAME
 
@@ -146,8 +148,10 @@ const options = {
   html: { type: 'string' },
   url: { type: 'string' },
   expect: { type: 'string' },
+  save: { type: 'string' },
   // scenario and report
   'keep-open': { type: 'boolean' },
+  restart: { type: 'boolean' },
   record: { type: 'boolean' },
   pace: { type: 'string' },
   gif: { type: 'boolean' },
@@ -266,7 +270,7 @@ export async function phoneCommand(o: Values, positionals: string[], ctx: Comman
     case 'open-link':
       return { ...(await phone.openLink(need(pos[0], 'URI'), { package: o.package?.[0], shot })) };
     case 'launch':
-      return { ...(await phone.launch({ package: o.package?.[0], shot })) };
+      return { ...(await phone.launch({ package: o.package?.[0], shot, restart: o.restart })) };
     case 'logs': {
       if (pos[0] === 'mark') return { ...(await phone.markLogs()) };
       return {

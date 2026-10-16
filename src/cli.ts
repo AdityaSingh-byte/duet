@@ -78,7 +78,7 @@ export async function main(argv: string[]): Promise<void> {
       let video: Awaited<ReturnType<typeof composeRunVideo>> | undefined;
       if (values.record) {
         try {
-          video = await composeRunVideo(result.runDir, { gif: values.gif });
+          video = await composeRunVideo(result.runDir, { gif: values.gif, warn: (m) => process.stderr.write(`  ${m}\n`) });
         } catch (e) {
           process.stderr.write(`  no video: ${(e as Error).message}\n`);
         }
@@ -91,7 +91,7 @@ export async function main(argv: string[]): Promise<void> {
     if (group === 'video') {
       const dir = positionals[0];
       if (!dir) throw new DuetError('Missing RUN_DIR.', 'usage');
-      const video = await composeRunVideo(dir, { gif: values.gif });
+      const video = await composeRunVideo(dir, { gif: values.gif, warn: (m) => process.stderr.write(`  ${m}\n`) });
       buildReport(dir);
       print({ ok: true, ...video });
       return;

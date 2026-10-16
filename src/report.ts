@@ -16,13 +16,18 @@ function groupEvents(events: RunEvent[]): Group[] {
   const groups: Group[] = [];
   const hasSteps = events.some((e) => e.actor === 'scenario' && e.action === 'step');
   for (const e of events) {
+    if (e.actor === 'scenario' && e.action === 'save' && groups.length) {
+      groups[groups.length - 1]!.events.push(e);
+      continue;
+    }
     if (e.actor === 'scenario') {
       if (e.action === 'step') groups.push({ step: e.args as Group['step'], events: [] });
       else if (e.action === 'evidence') groups.push({ step: { index: 0, source: '' }, events: [] });
       continue;
     }
     if (e.action === 'close') continue;
-    if (hasSteps && groups.length) groups[groups.length - 1]!.events.push(e);
+    if (hasSteps && !groups.length) groups.push({ step: { index: -1, source: '' }, events: [] });
+    if (hasSteps) groups[groups.length - 1]!.events.push(e);
     else groups.push({ events: [e] });
   }
   return groups;
@@ -54,6 +59,8 @@ function describeEvent(e: RunEvent): string {
       return r.matched !== undefined ? `logs: ${r.matched} of ${r.total} lines matched` : 'logs';
     case 'logs-mark':
       return 'mark the device log';
+    case 'save':
+      return `saved ${a.name} = ${JSON.stringify(a.value)}`;
     case 'screenshot':
       return a.label ? `screenshot (${a.label})` : 'screenshot';
     case 'eval':
@@ -128,9 +135,9 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
       const ms = g.events.reduce((sum, e) => sum + (e.ms ?? 0), 0);
       const actor = g.events.find((e) => e.actor !== 'scenario')?.actor ?? '';
       const head = g.step
-        ? g.step.index
+        ? g.step.index > 0
           ? `<span class="num">${g.step.index}</span><code>${esc(g.step.source)}</code>`
-          : `<span class="num"></span><span class="actor">Evidence collected after the failure</span>`
+          : `<span class="num"></span><span class="actor">${g.step.index < 0 ? 'Setup' : 'Evidence collected after the failure'}</span>`
         : `<span class="num">${i + 1}</span><span class="actor">${esc(actor)}</span> ${esc(describeEvent(g.events[0]!))}`;
       const detail = g.step
         ? g.events

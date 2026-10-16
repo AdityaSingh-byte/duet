@@ -207,8 +207,11 @@ export async function startMcpServer(): Promise<void> {
 
   server.registerTool(
     'phone_launch',
-    { description: 'Start the app under test (or `package`) from its launcher activity.', inputSchema: { package: z.string().optional(), shot } },
-    async (a) => respond(async () => (await getPhone()).launch({ package: a.package, shot: a.shot })),
+    {
+      description: 'Start the app under test (or `package`) from its launcher activity. `restart` stops the app under test first, so it opens fresh.',
+      inputSchema: { package: z.string().optional(), restart: z.boolean().optional(), shot },
+    },
+    async (a) => respond(async () => (await getPhone()).launch({ package: a.package, restart: a.restart, shot: a.shot })),
   );
 
   server.registerTool(

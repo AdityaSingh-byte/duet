@@ -44,3 +44,17 @@ describe('notes', () => {
     expect(html).toContain('<code>host: click --text Join</code>');
   });
 });
+
+describe('setup', () => {
+  it('events before the first step are an unnumbered Setup row, not step 1', () => {
+    const run = new RunDir(mkdtempSync(join(tmpdir(), 'duet-rep-')));
+    run.record({ actor: 'scenario', action: 'start', ok: true, args: { name: 'x' } });
+    run.record({ actor: 'phone', action: 'logs-mark', ok: true, result: { mark: '1.000' } });
+    run.record({ actor: 'scenario', action: 'step', ok: true, args: { index: 1, source: 'phone: launch' } });
+    run.record({ actor: 'phone', action: 'launch', ok: true });
+    const html = readFileSync(buildReport(run.dir), 'utf8');
+    expect(html).toContain('<span class="actor">Setup</span>');
+    expect(html).toContain('<span class="num">1</span><code>phone: launch</code>');
+    expect(html.match(/<span class="num">1<\/span>/g)).toHaveLength(1);
+  });
+});

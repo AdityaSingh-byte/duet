@@ -34,7 +34,7 @@ export interface Scenario {
 }
 
 export type Step =
-  | { index: number; source: string; kind: 'phone' | 'browser'; actor: string; argv: string[] }
+  | { index: number; source: string; kind: 'phone' | 'browser'; actor: string; argv: string[]; saves?: string }
   | { index: number; source: string; kind: 'pause'; ms: number }
   | { index: number; source: string; kind: 'note'; text: string };
 
@@ -47,8 +47,10 @@ const CHECKS = new Set(['wait-for', 'rotation', 'logs', 'screenshot', 'ui', 'sta
  * Replaces ${NAME} with an environment variable (or SCENARIO_DIR), and ${NAME:-fallback} with the
  * variable or the fallback. An unset variable without a fallback is an error, not an empty string.
  */
-function interpolate(text: string, vars: Record<string, string | undefined>, where: string): string {
-  return text.replace(/\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}/g, (_, name: string, fallback: string | undefined) => {
+function interpolate(text: string, vars: Record<string, string | undefined>, where: string, keep: ReadonlySet<string> = new Set()): string {
+  return text.replace(/\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}/g, (all, name: string, fallback: string | undefined) => {
+    // Saved by an earlier step (--save NAME): filled in when the step runs.
+    if (keep.has(name)) return all;
     const v = vars[name] ?? fallback;
     if (v === undefined) throw new DuetError(`${where}: \${${name}} is not set.`, 'usage');
     return v;
@@ -101,6 +103,8 @@ export function loadScenario(path: string): Scenario {
         : [];
   if (!rawSteps.length) throw new DuetError(`${path} has no steps.`, 'usage');
 
+  // Names saved by earlier steps (--save NAME), so later steps can use ${NAME}.
+  const saved = new Set<string>();
   const steps: Step[] = rawSteps.map((raw: unknown, i: number): Step => {
     const where = `step ${i + 1}`;
     if (!raw || typeof raw !== 'object' || Object.keys(raw).length !== 1) {
@@ -108,7 +112,15 @@ export function loadScenario(path: string): Scenario {
     }
     let [key, value] = Object.entries(raw)[0]! as [string, unknown];
     const source = `${key}: ${String(value)}`;
-    if (typeof value === 'string') value = interpolate(value, vars, where);
+    if (typeof value === 'string') {
+      try {
+        value = interpolate(value, vars, where, saved);
+      } catch (e) {
+        const m = /\$\{(\w+)\} is not set/.exec((e as Error).message);
+        const later = m && rawSteps.slice(i + 1).some((r) => JSON.stringify(r).includes(`--save ${m[1]}`));
+        throw later ? new DuetError(`${where}: \${${m![1]}} is used before the step that saves it.`, 'usage') : e;
+      }
+    }
     if (key === 'pause') {
       const ms = Number(value);
       if (!Number.isFinite(ms) || ms < 0) throw new DuetError(`${where}: pause takes milliseconds.`, 'usage');
@@ -124,12 +136,19 @@ export function loadScenario(path: string): Scenario {
     } catch (e) {
       throw new DuetError(`${where}: ${(e as Error).message}`, 'usage');
     }
+    let saves: string | undefined;
     try {
-      parse(argv);
+      const { values, positionals } = parse(argv);
+      saves = values.save;
+      if (saves !== undefined) {
+        if (!/^[A-Z_][A-Z0-9_]*$/.test(saves)) throw new Error(`--save takes an upper-case name such as CODE, got "${saves}"`);
+        if (def.phone || positionals[0] !== 'eval') throw new Error('--save works with a browser eval step, e.g. "host: eval EXPR --save CODE"');
+        saved.add(saves);
+      }
     } catch (e) {
       throw new DuetError(`${where}: ${(e as Error).message}`, 'usage');
     }
-    return { index: i + 1, source, kind: def.phone ? 'phone' : 'browser', actor: key, argv };
+    return { index: i + 1, source, kind: def.phone ? 'phone' : 'browser', actor: key, argv, saves };
   });
   return { name, actors, steps };
 }
@@ -248,6 +267,8 @@ export async function runScenario(path: string, opts: RunOptions): Promise<Scena
 
   let passed = 0;
   let failed: ScenarioResult['failed'];
+  const runtime: Record<string, string> = {};
+  const fill = (argv: string[], where: string) => argv.map((a) => interpolate(a, runtime, where));
   try {
     // Connect every phone and mark its log first, so a failure can show exactly what each device logged during the run.
     try {
@@ -273,13 +294,17 @@ export async function runScenario(path: string, opts: RunOptions): Promise<Scena
         else if (step.kind === 'note') {
           /* a heading in the report */
         } else if (step.kind === 'phone') {
-          const { values, positionals } = parse(step.argv);
+          const { values, positionals } = parse(fill(step.argv, `step ${step.index}`));
           const phone = await phoneFor(step.actor);
           await phoneCommand(values, positionals, { ...ctx, phone: async () => phone });
         } else {
-          const { values, positionals } = parse(step.argv);
+          const { values, positionals } = parse(fill(step.argv, `step ${step.index}`));
           const [cmd, ...rest] = positionals;
-          await browserCommand(values, [cmd!, step.actor, ...rest], ctx);
+          const out = await browserCommand(values, [cmd!, step.actor, ...rest], ctx);
+          if (step.saves) {
+            runtime[step.saves] = typeof out.value === 'string' ? out.value : JSON.stringify(out.value);
+            run.record({ actor: 'scenario', action: 'save', ok: true, args: { name: step.saves, value: runtime[step.saves] } });
+          }
         }
         passed++;
       } catch (e) {

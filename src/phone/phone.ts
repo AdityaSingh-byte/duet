@@ -349,12 +349,17 @@ export class Phone {
     });
   }
 
-  /** Starts the app's launcher activity. */
-  async launch(opts: { package?: string; shot?: boolean } = {}) {
+  /** Starts the app's launcher activity. With `restart`, stops the app first so it opens fresh. */
+  async launch(opts: { package?: string; shot?: boolean; restart?: boolean } = {}) {
     const pkg = opts.package ?? this.policy.packages[0];
-    return this.step('launch', { package: pkg }, async () => {
+    return this.step('launch', { package: pkg, restart: opts.restart }, async () => {
       if (!pkg) throw new DuetError('No package to launch. Pass --package or set phone.packages in duet.config.json.', 'usage');
       await this.ensureSafe('launch', `launch ${pkg}`);
+      if (opts.restart) {
+        // Only ever the app under test: never stop someone's other apps.
+        if (!this.policy.packages.includes(pkg)) throw new DuetError(`--restart only stops the app under test (${this.policy.packages.join(', ') || 'none set'}).`, 'usage');
+        await this.adb.shell(['am', 'force-stop', pkg]);
+      }
       const out = await this.adb.shell(['cmd', 'package', 'resolve-activity', '--brief', '-c', 'android.intent.category.LAUNCHER', pkg], {
         allowFail: true,
       });
