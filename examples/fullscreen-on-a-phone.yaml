@@ -20,6 +20,8 @@ steps: |
   host: click --text "Join room"
   host: click --text "Present your screen" --say "present the slides tab"
   host: wait-for --text "Presenting a browser tab"
+  # Chrome switches to the shared tab; the presenter goes back to their own page
+  host: front
 
   note: The viewer opens the room link on the phone and joins
   viewer: reverse 8080

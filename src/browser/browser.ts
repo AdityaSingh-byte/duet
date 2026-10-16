@@ -252,6 +252,17 @@ export class BrowserActor {
     });
   }
 
+  /**
+   * Brings this page (or the tab picked with --tab) to the front. Chrome switches to a tab when
+   * another page starts sharing it; a presenter goes back to their own page.
+   */
+  async front() {
+    return this.step('front', {}, async () => {
+      await this.page.bringToFront();
+      return { result: { front: await this.page.title() } };
+    });
+  }
+
   /** Visible buttons, links and fields with their labels. */
   async ui(limit = 120): Promise<string[]> {
     return this.step('ui', {}, async () => ({ result: await this.page.evaluate(pageInteractive, limit) }));

@@ -12,9 +12,10 @@ export const HELP = `duet: let an AI agent test on a real Android phone and a vi
 
 Usage: duet phone <command> [options]
        duet browser <command> <name> [options]
-       duet scenario run FILE [--keep-open] [--runs-dir D]
+       duet scenario run FILE [--record [--gif]] [--pace MS] [--keep-open] [--runs-dir D]
        duet scenario check FILE
        duet report [RUN_DIR] [--inline] [--out FILE]
+       duet video RUN_DIR [--gif]    rebuild a recorded run's video
        duet mcp                      serve every command as MCP tools over stdio
 
 PHONE
@@ -62,6 +63,7 @@ BROWSER (a visible Chrome per name, e.g. host or guest; it stays open between co
   press NAME KEY                e.g. Enter, Escape, Tab
   wait-for NAME --text T | --selector CSS [--gone]
   say NAME TEXT                 show a step banner on the page
+  front NAME [--tab T]          bring the page (or a tab) to the front; sharing a tab switches to it
   screenshot NAME [--label L] [--full-page]
   ui NAME                       buttons, links and fields with their labels
   new-tab NAME --title T [--text X | --html H | --url U]
@@ -81,6 +83,9 @@ SCENARIO (a YAML file of the same commands, one actor per step)
                     collect each actor's screenshot and each phone's logs, write report.html
   check FILE        validate the file without touching any device
   --keep-open       leave the browsers it started open afterwards
+  --record          record each phone and browser, and join them into video/run.mp4 (needs ffmpeg)
+  --gif             with --record, also write video/run.gif
+  --pace MS         wait MS before each step, so a recording or a person can follow
 
 REPORT
   report [RUN_DIR]  write RUN_DIR/report.html (default: the current run folder)
@@ -143,6 +148,9 @@ const options = {
   expect: { type: 'string' },
   // scenario and report
   'keep-open': { type: 'boolean' },
+  record: { type: 'boolean' },
+  pace: { type: 'string' },
+  gif: { type: 'boolean' },
   'runs-dir': { type: 'string' },
   inline: { type: 'boolean' },
   out: { type: 'string' },
@@ -279,7 +287,7 @@ export async function phoneCommand(o: Values, positionals: string[], ctx: Comman
 
 // ---- browser ------------------------------------------------------------------
 
-export const BROWSER_COMMANDS = new Set(['open', 'goto', 'click', 'fill', 'press', 'wait-for', 'say', 'screenshot', 'ui', 'new-tab', 'eval', 'list', 'close']);
+export const BROWSER_COMMANDS = new Set(['open', 'goto', 'click', 'fill', 'press', 'wait-for', 'say', 'front', 'screenshot', 'ui', 'new-tab', 'eval', 'list', 'close']);
 
 export async function browserCommand(o: Values, positionals: string[], ctx: CommandContext): Promise<Record<string, unknown>> {
   const [cmd, name, ...pos] = positionals as [string, string | undefined, ...string[]];
@@ -344,6 +352,8 @@ export async function browserCommand(o: Values, positionals: string[], ctx: Comm
         run.record({ actor: actorName, action: 'say', args: { text }, ok: true });
         return { said: text };
       }
+      case 'front':
+        return { ...(await actor.front()) };
       case 'screenshot':
         return { ...(await actor.screenshot({ label: o.label, fullPage: o['full-page'] })) };
       case 'ui':

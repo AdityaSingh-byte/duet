@@ -369,6 +369,12 @@ export async function startMcpServer(): Promise<void> {
   );
 
   server.registerTool(
+    'browser_front',
+    { description: 'Bring a browser actor\'s page (or a tab) to the front. Chrome switches to a tab when another page starts sharing it.', inputSchema: { name, tab } },
+    async (a) => withBrowser(a.name, a.tab, (b) => b.front()),
+  );
+
+  server.registerTool(
     'browser_screenshot',
     { description: 'Screenshot of a browser actor (banner hidden), returned as an image.', inputSchema: { name, label: z.string().optional(), fullPage: z.boolean().optional(), tab } },
     async (a) => withBrowser(a.name, a.tab, (b) => b.screenshot({ label: a.label, fullPage: a.fullPage })),

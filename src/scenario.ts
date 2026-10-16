@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { BrowserActor, BrowserRegistry, type OpenOptions } from './browser/browser.js';
@@ -6,6 +6,7 @@ import { isAlive } from './browser/chrome.js';
 import { browserCommand, parse, phoneCommand, type CommandContext } from './commands.js';
 import type { DuetConfig } from './config.js';
 import { Phone } from './phone/phone.js';
+import { BrowserRecorder, PhoneRecorder, type Track } from './record.js';
 import { RunDir } from './run.js';
 import { DuetError } from './util/errors.js';
 import { splitWords } from './util/words.js';
@@ -38,6 +39,9 @@ export type Step =
   | { index: number; source: string; kind: 'note'; text: string };
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i;
+
+/** Commands that only look. --pace never delays these, so it cannot change a result. */
+const CHECKS = new Set(['wait-for', 'rotation', 'logs', 'screenshot', 'ui', 'status', 'eval']);
 
 /**
  * Replaces ${NAME} with an environment variable (or SCENARIO_DIR), and ${NAME:-fallback} with the
@@ -155,7 +159,18 @@ function pair(v: string | undefined, sep: RegExp): [number, number] | undefined 
  * Stops at the first failing step and collects evidence from every actor:
  * a screenshot each, and each phone's logs since the scenario started.
  */
-export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir?: string; keepOpen?: boolean; log?: (line: string) => void }): Promise<ScenarioResult> {
+export interface RunOptions {
+  cfg: DuetConfig;
+  runsDir?: string;
+  keepOpen?: boolean;
+  /** Record every phone (screenrecord) and browser (screencast) into video/. */
+  record?: boolean;
+  /** Wait this long before each step, so a recording or a person watching can follow. */
+  paceMs?: number;
+  log?: (line: string) => void;
+}
+
+export async function runScenario(path: string, opts: RunOptions): Promise<ScenarioResult> {
   const scenario = loadScenario(path);
   const slug = scenario.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   const run = new RunDir(join(opts.runsDir ?? 'runs', `${stamp()}-${slug || 'scenario'}`));
@@ -164,6 +179,9 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
   const phones = new Map<string, Phone>();
   const browsers = new Map<string, BrowserActor>();
   const launchedHere = new Set<string>();
+  const phoneRecorders: PhoneRecorder[] = [];
+  const browserRecorders = new Map<string, BrowserRecorder>();
+  if (opts.record) mkdirSync(join(run.dir, 'video'), { recursive: true });
 
   const phoneFor = async (actor: string): Promise<Phone> => {
     let phone = phones.get(actor);
@@ -206,6 +224,7 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
       if (launched && !running) launchedHere.add(actor);
       b = opened;
       browsers.set(actor, b);
+      if (opts.record) browserRecorders.set(actor, await BrowserRecorder.start(b, run));
     }
     return b;
   };
@@ -233,13 +252,20 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
     // Connect every phone and mark its log first, so a failure can show exactly what each device logged during the run.
     try {
       for (const [actor, def] of Object.entries(scenario.actors)) {
-        if (def.phone) await (await phoneFor(actor)).markLogs();
+        if (!def.phone) continue;
+        const phone = await phoneFor(actor);
+        await phone.markLogs();
+        if (opts.record) phoneRecorders.push(await PhoneRecorder.start(phone));
       }
     } catch (e) {
       failed = { index: 0, source: 'setup', error: (e as Error).message };
       log(`  setup failed: ${failed.error}`);
     }
     for (const step of failed ? [] : scenario.steps) {
+      // Pace only before actions and notes. A check right after an action runs at once, so pacing
+      // a recording never changes what the test measures.
+      const isCheck = (step.kind === 'phone' || step.kind === 'browser') && CHECKS.has(step.argv[0]!);
+      if (opts.paceMs && !isCheck) await new Promise((r) => setTimeout(r, opts.paceMs));
       run.record({ actor: 'scenario', action: 'step', ok: true, args: { index: step.index, source: step.source } });
       log(`  ${step.index}. ${step.source}`);
       try {
@@ -264,6 +290,14 @@ export async function runScenario(path: string, opts: { cfg: DuetConfig; runsDir
     }
     if (failed && failed.index > 0) await collectEvidence(run, phones, browsers, log);
   } finally {
+    if (opts.record) {
+      // Let the last screen settle on video, then stop every recording before any browser closes.
+      await new Promise((r) => setTimeout(r, 1500));
+      const tracks: Track[] = [];
+      for (const r of phoneRecorders) await r.stop(run).then((t) => tracks.push(t)).catch((e: Error) => log(`  phone recording lost: ${e.message}`));
+      for (const r of browserRecorders.values()) await r.stop().then((t) => tracks.push(t)).catch((e: Error) => log(`  browser recording lost: ${e.message}`));
+      writeFileSync(join(run.dir, 'video', 'tracks.json'), JSON.stringify(tracks, null, 2));
+    }
     for (const [name, b] of browsers) {
       if (launchedHere.has(name) && !opts.keepOpen) await b.close(registry).catch(() => {});
       else await b.detach().catch(() => {});

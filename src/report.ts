@@ -179,6 +179,7 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
   .result { font-size: 15px; margin: 16px 0 4px; }
   .result.failed { color: var(--fail); font-weight: 600; }
   a { color: var(--link); }
+  video.run { display: block; width: 100%; margin: 16px 0 0; background: #161616; }
   ol.steps { list-style: none; margin: 24px 0 0; padding: 0; border-top: 1px solid var(--line); }
   .step { padding: 12px 0; border-bottom: 1px solid var(--line); }
   .note { padding: 24px 0 8px 32px; font-weight: 600; border-bottom: 1px solid var(--line); }
@@ -207,6 +208,7 @@ export function buildReport(runDir: string, opts: { inline?: boolean; out?: stri
   <h1>${esc(name)}</h1>
   <p class="meta">${esc(new Date(t0).toLocaleString())}${actorLine ? ` · ${actorLine}` : ''}</p>
   ${summary}
+  ${existsSync(join(run.dir, 'video', 'run.mp4')) ? `<video class="run" src="video/run.mp4" controls muted playsinline preload="metadata"></video>` : ''}
   <ol class="steps">
 ${rows}
   </ol>

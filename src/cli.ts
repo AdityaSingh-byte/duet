@@ -5,6 +5,7 @@ import { Phone } from './phone/phone.js';
 import { buildReport } from './report.js';
 import { RunDir } from './run.js';
 import { loadScenario, runScenario } from './scenario.js';
+import { composeRunVideo } from './video.js';
 import { DuetError, exitCodes } from './util/errors.js';
 
 function print(obj: unknown): void {
@@ -64,15 +65,35 @@ export async function main(argv: string[]): Promise<void> {
         return;
       }
       if (cmd !== 'run') throw new DuetError(`Unknown scenario command "${cmd}". Use run or check.`, 'usage');
+      const pace = values.pace === undefined ? undefined : Number(values.pace);
+      if (pace !== undefined && !Number.isFinite(pace)) throw new DuetError('--pace takes milliseconds.', 'usage');
       const result = await runScenario(file, {
         cfg,
         runsDir: values['runs-dir'],
         keepOpen: values['keep-open'],
+        record: values.record,
+        paceMs: pace,
         log: (line) => process.stderr.write(line + '\n'),
       });
+      let video: Awaited<ReturnType<typeof composeRunVideo>> | undefined;
+      if (values.record) {
+        try {
+          video = await composeRunVideo(result.runDir, { gif: values.gif });
+        } catch (e) {
+          process.stderr.write(`  no video: ${(e as Error).message}\n`);
+        }
+      }
       const report = buildReport(result.runDir);
-      print({ ...result, report });
+      print({ ...result, report, ...(video ? { video } : {}) });
       if (!result.ok) process.exitCode = 1;
+      return;
+    }
+    if (group === 'video') {
+      const dir = positionals[0];
+      if (!dir) throw new DuetError('Missing RUN_DIR.', 'usage');
+      const video = await composeRunVideo(dir, { gif: values.gif });
+      buildReport(dir);
+      print({ ok: true, ...video });
       return;
     }
     if (group === 'report') {
