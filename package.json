@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/AdityaSingh-byte/duet.git"
   },
-  "homepage": "https://github.com/AdityaSingh-byte/duet#readme",
+  "homepage": "https://adityasingh-byte.github.io/duet/",
   "bugs": {
     "url": "https://github.com/AdityaSingh-byte/duet/issues"
   },
@@ -33,7 +33,8 @@
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
   },
   "keywords": [
     "android",
