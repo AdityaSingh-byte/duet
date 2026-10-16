@@ -63,7 +63,7 @@ export interface ResignOptions {
   alias?: string;
 }
 
-const WINDOW_FIELDS = 'isKeyguardShowing|KeyguardShowing|mShowingLockscreen|mDreamingLockscreen|isStatusBarKeyguard|mCurrentFocus=|mRotation=|mCurrentRotation=';
+const WINDOW_FIELDS = 'isKeyguardShowing|KeyguardShowing|mShowingLockscreen|mDreamingLockscreen|isStatusBarKeyguard|mCurrentFocus=|mRotation=|mCurrentRotation=|mGlobalConfiguration=';
 const DUMP_PATH = '/data/local/tmp/duet-ui.xml';
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -100,7 +100,7 @@ export class Phone {
 
   async status(): Promise<PhoneStatus> {
     const [win, act, power, home] = await Promise.all([
-      this.adb.shellRaw(`dumpsys window | grep -E '${WINDOW_FIELDS}'`, { allowFail: true }),
+      this.adb.shellRaw(`dumpsys window | grep -E '${WINDOW_FIELDS}' | grep -v -i snapshot`, { allowFail: true }),
       this.adb.shellRaw(`dumpsys activity activities | grep -E 'ResumedActivity|KeyguardShowing'`, { allowFail: true }),
       this.adb.shellRaw(`dumpsys power | grep -E 'mWakefulness='`, { allowFail: true }),
       this.homePackage(),
@@ -223,7 +223,7 @@ export class Phone {
 
   private async readRotation(): Promise<{ rotation: Rotation; degrees: number; landscape: boolean }> {
     const [win, size] = await Promise.all([
-      this.adb.shellRaw(`dumpsys window | grep -E 'mRotation=|mCurrentRotation='`, { allowFail: true }),
+      this.adb.shellRaw(`dumpsys window | grep -E 'mRotation=|mCurrentRotation=|mGlobalConfiguration=' | grep -v -i snapshot`, { allowFail: true }),
       this.adb.shell(['wm', 'size']),
     ]);
     const rotation = parseRotation(win);

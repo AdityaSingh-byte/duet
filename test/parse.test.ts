@@ -97,3 +97,27 @@ describe('small parsers', () => {
     expect(parsePids('')).toEqual([]);
   });
 });
+
+describe('parseRotation on a real Android 16 dump (Samsung)', () => {
+  // Trimmed from `dumpsys window` on an Android 16 phone, portrait, then the same fields in landscape.
+  // A stale window config and an app snapshot both say 0 while the display is at 90.
+  const landscape = [
+    '  overrideConfig={0.9 ldltr sw411dp w411dp h891dp 420dpi port winConfig={ mBounds=Rect(0, 0 - 1080, 2340) mDisplayRotation=ROTATION_0 mRotation=ROTATION_0 }}',
+    '  mCurrentFocus=Window{fc5297b u0 dev.duet.sample/dev.duet.sample.MainActivity}',
+    '     snapshot=TaskSnapshot{ mId=1 mTopActivityComponent=com.example.other/.Main mOrientation=1 mRotation=0 mTaskSize=Point(1080, 2340)',
+    '    mRotation=1 mDeferredRotationPauseCount=0',
+    '      mCurrentRotation=ROTATION_90',
+    '  mGlobalConfiguration={0.9 ldltr sw411dp w891dp h411dp 420dpi land winConfig={ mDisplayRotation=ROTATION_90 mRotation=ROTATION_90 }}',
+  ].join('\n');
+
+  it('prefers the display rotation over stale configs and other apps\' snapshots', () => {
+    expect(parseRotation(landscape)).toBe(1);
+  });
+  it('falls back through the older fields', () => {
+    expect(parseRotation(landscape.replace('mCurrentRotation=ROTATION_90', ''))).toBe(1);
+    expect(parseRotation('  mGlobalConfiguration={0.9 land winConfig={ mDisplayRotation=ROTATION_270 }}')).toBe(3);
+  });
+  it('ignores snapshot lines entirely', () => {
+    expect(parseRotation('     snapshot=TaskSnapshot{ mOrientation=1 mRotation=1 }')).toBeNull();
+  });
+});

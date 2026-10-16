@@ -92,15 +92,30 @@ export function parseWakefulness(out: string): Wakefulness | null {
 export type Rotation = 0 | 1 | 2 | 3;
 
 /**
- * From `dumpsys window displays`. Newer builds print `mRotation=ROTATION_90` (degrees),
- * older ones `mRotation=1` (quarter turns). `mCurrentRotation` shows up on some vendor builds.
+ * From `dumpsys window`. The output repeats `mRotation=` in many places, including saved
+ * snapshots of other apps, so the display's own fields are tried first:
+ * `mCurrentRotation=ROTATION_90` (DisplayRotation, Android 13+), then `mRotation=1` next to
+ * `mDeferredRotationPauseCount` (older DisplayRotation), then `mDisplayRotation=ROTATION_90` in the
+ * global configuration, then any `mRotation=`. Snapshot lines are ignored.
+ * Degrees (ROTATION_90) and quarter turns (1) are both accepted.
  */
 export function parseRotation(out: string): Rotation | null {
-  const m = /\bm(?:Current)?Rotation=(ROTATION_)?(\d+)\b/.exec(out);
-  if (!m) return null;
-  const n = Number(m[2]);
-  const quarter = m[1] ? n / 90 : n;
-  return Number.isInteger(quarter) && quarter >= 0 && quarter <= 3 ? (quarter as Rotation) : null;
+  const lines = out.split('\n').filter((l) => !/snapshot/i.test(l));
+  const text = lines.join('\n');
+  const patterns = [
+    /\bmCurrentRotation=(ROTATION_)?(\d+)\b/,
+    /\bmRotation=(ROTATION_)?(\d+)\s+mDeferredRotation/,
+    /\bmGlobalConfiguration=.*?\bmDisplayRotation=(ROTATION_)(\d+)\b/,
+    /\bmRotation=(ROTATION_)?(\d+)\b/,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (!m) continue;
+    const n = Number(m[2]);
+    const quarter = m[1] ? n / 90 : n;
+    return Number.isInteger(quarter) && quarter >= 0 && quarter <= 3 ? (quarter as Rotation) : null;
+  }
+  return null;
 }
 
 export interface WmSize {
