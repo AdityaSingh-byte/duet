@@ -59,6 +59,10 @@ Afterwards I rebuilt the approach from scratch, with no company code, as [duet](
 
 The repo includes a small, open sample (a host page, a relay and an Expo viewer app) with the same bug planted on a branch, and a two-actor scenario that catches it. Run on a real phone, it fails the way the original did: the phone turns sideways, and a moment later it is back in portrait, with `full screen open`, `stage unmounted`, `full screen closed` in the log within 150 ms. The fixed build passes the same 24 steps. `duet scenario run --record` films both sides; the video at the top of the README is those two runs.
 
+## A second demo, with three actors
+
+Rotation bugs are hard to show to someone who was not there, so the repo has a second demo that anyone can follow: signing in on the web by approving on your phone. Two browsers wait with their own codes; the phone enters the laptop's code. The planted bug checks the code and then signs in the newest waiting browser, which is the right one whenever only one browser is waiting. So every one-browser test passes, and it takes two browsers and a phone, plus passing the laptop's code from one actor to another (`--save`), to see it.
+
 ## What it is not
 
 duet is glue around adb and Puppeteer, not a testing framework. Plenty of tools already let an agent drive a single phone or a single browser, and Maestro's MCP server already lets an agent write and run flows on one device. What duet adds is the part I needed: several actors in one scenario, on a real phone that may be someone's own, with the log next to every failure.

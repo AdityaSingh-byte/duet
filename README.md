@@ -4,14 +4,16 @@ Lets an AI coding agent test a feature the way a QA person would: on a **real An
 
 duet is not a testing framework. It is a small harness around adb and Puppeteer. It gives an agent (Claude Code through MCP, or anything that can run a CLI) safe commands that each do one thing, records every step with its screenshot, and keeps the device log at hand. The agent can then find out *why* something failed, fix the code, and run the same steps again.
 
-![A recorded duet run: a host presents a slides tab from Chrome, a viewer on a real Android phone taps Full screen. The build with the bug fails, the fixed build passes.](docs/media/demo.gif)
+![Two Chrome windows wait to be signed in, each showing a code. A real Android phone enters the laptop's code and approves. With the planted bug the desktop gets signed in instead and the test fails; with the fix the laptop is signed in and the test passes.](docs/media/demo-pairing.gif)
 
-*A real recorded run, made by `duet scenario run --record` and [scripts/make-demo-video.mjs](scripts/make-demo-video.mjs). Full video, with both takes from start to finish: [docs/media/demo.mp4](docs/media/demo.mp4).*
+*Three actors in one test, recorded by duet on a real Android phone. Two browsers wait to be signed in; the phone enters the laptop's code and approves. With the planted bug the desktop gets signed in instead, and the test fails. With the fix it passes. [Full video](docs/media/demo-pairing.mp4) · [the scenario](examples/sign-in-with-phone.yaml)*
 
 > **Status: early (0.1).** Tested end to end on a Samsung Galaxy S24 FE (Android 16) and Chrome 155 on macOS. Other phones and Android versions are untested. The guard fails closed when it cannot read something, so if it misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
 
 ## Contents
 
+- [Demos](#demos)
+- [How it works](#how-it-works)
 - [Why](#why)
 - [What it does](#what-it-does)
 - [Install](#install)
@@ -22,10 +24,30 @@ duet is not a testing framework. It is a small harness around adb and Puppeteer.
 - [Safe on someone's own phone](#safe-on-someones-own-phone)
 - [How it compares](#how-it-compares)
 - [Things that bit us](#things-that-bit-us)
-- [The sample app](#the-sample-app)
+- [The sample apps](#the-sample-apps)
 - [Limits](#limits)
 - [Development](#development)
 - [Credits](#credits)
+
+## Demos
+
+Both are real runs on an Android phone, recorded by duet itself (`duet scenario run --record`), against small open sample apps with a bug planted on purpose. Each is run twice: with the bug, where the test fails, and with the fix, where the same steps pass.
+
+### Sign in on the right browser: two browsers and a phone
+
+Signing in on the web by approving on your phone, the way messaging apps pair their web versions. A browser shows a 6-digit code; the [duet pair app](sample/pair-app) on the phone enters it and approves; that browser is signed in.
+
+The planted bug (`PAIR_BUG=1` on the [sample server](sample/server)) checks that the code exists, then signs in the *newest* waiting browser. With one browser waiting, that is the right one, so every one-browser test passes. The scenario keeps two browsers waiting, reads the laptop's code with `eval ... --save LAPTOP_CODE`, types it on the phone, and checks that the laptop is signed in and the desktop is not. GIF above; [full video](docs/media/demo-pairing.mp4); [scenario](examples/sign-in-with-phone.yaml).
+
+### Full screen survives turning the phone sideways: a browser and a phone
+
+![A host presents a slides tab from Chrome; a viewer on a real Android phone taps Full screen. With the bug the phone turns sideways and back again, and the test fails; with the fix it stays in landscape and the test passes.](docs/media/demo-rotation.gif)
+
+A host presents a tab from Chrome; a viewer watches on the phone and taps "Full screen". With the bug, the phone turns sideways, the layout switches to two panes, the stage remounts, and full screen closes itself: right after the tap the phone *is* in landscape, and 1.5 s later it is back in portrait. The device log shows `full screen open`, `stage unmounted`, `full screen closed` within 150 ms. [Full video](docs/media/demo-rotation.mp4); [scenario](examples/fullscreen-on-a-phone.yaml).
+
+## How it works
+
+![An AI agent calls duet through MCP or the CLI. duet drives an Android phone over adb and Chrome windows through Puppeteer, and writes every step to a run folder with screenshots, logs, a report and a video.](docs/media/how-it-works.svg)
 
 ## Why
 
@@ -160,6 +182,13 @@ duet scenario run examples/fullscreen-on-a-phone.yaml --record --pace 900   # an
 - Because the steps are the commands an agent already uses, a sequence it worked out by hand can be saved and replayed after every fix.
 - `note:` lines become headings in the report. `pause: MS` waits; prefer `wait-for`, and keep `pause` for "it should still be like this a moment later".
 - `${VAR}` comes from the environment, and `${SCENARIO_DIR}` is the scenario's folder. An unset variable is an error unless it has a fallback: `${VAR:-fallback}`.
+- Values can pass between actors. `eval EXPR --save NAME` on a browser step keeps the result, and later steps use it as `${NAME}`: a sign-in code, a room link, an invite id. duet checks before the run that nothing is used before it is saved.
+
+  ```yaml
+  steps: |
+    laptop: eval "document.querySelector('#code').dataset.code" --save LAPTOP_CODE
+    phone: type ${LAPTOP_CODE}
+  ```
 - Browsers the scenario started are closed at the end. Pass `--keep-open` to leave them up.
 - `--pace MS` waits before each action, so a person or a recording can follow. It never delays a check (`wait-for`, `rotation`, `logs`, `screenshot`), so pacing cannot change a result.
 
@@ -172,6 +201,8 @@ Every step goes to `events.jsonl` in the run folder: actor, action, arguments, r
 `duet scenario run FILE --record` also records every actor while it runs: each phone with Android's own `screenrecord`, each browser through Chrome's screencast. It then joins them side by side into `video/run.mp4`, lined up in time, with the current step as a caption and the result at the end, and the report shows it at the top. Add `--gif` for a GIF too, and run `duet video RUN_DIR` to rebuild the video later. It needs ffmpeg.
 
 The phone recording only starts if the guard allows looking at the screen, and the phone's status bar (your notification icons) is cropped out of the video. Android stops `screenrecord` after 3 minutes.
+
+![The report of a failed run: the failure at the top, the recorded video of all three actors, then every step with its timing, including the value saved from the laptop and typed on the phone.](docs/media/report.png)
 
 ## Safe on someone's own phone
 
@@ -208,11 +239,18 @@ If one surface is enough, use one of them. duet is for the case they leave to yo
 - **uiautomator has blind spots.** It cannot read a screen that never goes idle (live video, endless animation), and it misses some overlays. Fall back to a screenshot and coordinates.
 - **Signatures.** A release APK signed with a different key will not install over the existing app. Re-sign it with the key the installed copy uses (`install --resign`) rather than uninstalling.
 - **A ghost finger.** An automation tool killed in the middle of a gesture can leave an injected touch pressed. From then on Android rejects every injected tap ("pointers already down"), while `adb shell input tap` still exits 0. That is what we found on our test phone the first time duet ran on it. duet checks the input dispatcher's verdict after every tap and fails with its reason, and `duet phone unstick` releases the stuck pointer with a small helper ([android/unstick](android/unstick/Unstick.java)), because `input` can only send pointer 0.
+- **A page that sits still records nothing.** Chrome's screencast only sends a frame when the page changes, so a browser that just waits (the desktop in the sign-in demo) came out as an empty file. While recording, duet keeps a 2 px, nearly invisible element moving so frames keep coming.
 - **Sharing a tab switches to it.** When a page shares another tab, Chrome brings the shared tab to the front, and the presenter's page stops being drawn (and recorded). `duet browser front` brings it back; the shared tab keeps streaming from the background.
 
-## The sample app
+## The sample apps
 
-[sample/](sample) is a small, open stand-in for a live session: a host page, a relay server, and an Expo viewer app. The full-screen rotation bug is planted on the `demo/rotation-bug` branch and fixed on `main`, so the demo scenario fails on one and passes on the other. See [sample/README.md](sample/README.md).
+[sample/](sample) holds everything the demos run against, with no outside accounts or services:
+
+- [sample/server](sample/server): one small Node server for both demos. It relays a host's shared tab to viewers, and serves the sign-in page and its API. `PAIR_BUG=1` plants the sign-in bug.
+- [sample/app](sample/app): the room viewer (Expo, `dev.duet.sample`). The full-screen bug is planted on the `demo/rotation-bug` branch and fixed on `main`.
+- [sample/pair-app](sample/pair-app): the duet pair app (Expo, `dev.duet.pair`) that enters a code and approves a browser.
+
+See [sample/README.md](sample/README.md) to run them.
 
 ## Limits
 
