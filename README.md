@@ -4,7 +4,11 @@ Lets an AI coding agent test a feature the way a QA person would: on a **real An
 
 duet is not a testing framework. It is a small harness around adb and Puppeteer. It gives an agent (Claude Code through MCP, or anything that can run a CLI) safe commands that each do one thing, records every step with its screenshot, and keeps the device log at hand. The agent can then find out *why* something failed, fix the code, and run the same steps again.
 
-> **Status: early (0.1).** The browser actor, scenarios, reports and the MCP server are tested end to end. The phone actor is unit tested against a simulated adb but has not yet been verified on a physical device. If the guard misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
+![A recorded duet run: a host presents a slides tab from Chrome, a viewer on a real Android phone taps Full screen. The build with the bug fails, the fixed build passes.](docs/media/demo.gif)
+
+*A real recorded run, made by `duet scenario run --record` and [scripts/make-demo-video.mjs](scripts/make-demo-video.mjs). Full video, with both takes from start to finish: [docs/media/demo.mp4](docs/media/demo.mp4).*
+
+> **Status: early (0.1).** Tested end to end on a Samsung Galaxy S24 FE (Android 16) and Chrome 155 on macOS. Other phones and Android versions are untested. The guard fails closed when it cannot read something, so if it misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
 
 ## Contents
 
@@ -14,7 +18,7 @@ duet is not a testing framework. It is a small harness around adb and Puppeteer.
 - [Quick start](#quick-start)
 - [Use it from Claude Code (MCP)](#use-it-from-claude-code-mcp)
 - [Scenarios](#scenarios)
-- [Reports](#reports)
+- [Reports and recordings](#reports-and-recordings)
 - [Safe on someone's own phone](#safe-on-someones-own-phone)
 - [How it compares](#how-it-compares)
 - [Things that bit us](#things-that-bit-us)
@@ -36,7 +40,7 @@ Finding that takes two actors (someone presenting from a browser, someone watchi
 - **Phone actor.** A real Android device over adb. Screenshots sized for the model, tap by text or by coordinates on the screenshot, deep links, typing, keys, rotation, logcat since a mark, `adb reverse`, and install over the existing app with re-signing. A guard checks the phone before every action.
 - **Browser actors.** Any number of named, visible Chrome windows ("host", "guest"), each with its own profile so sign-ins persist. Click by label, fill fields, wait for text, step banners on the page, a fake camera and microphone, and screen sharing of a chosen tab without the picker.
 - **Scenarios.** A YAML file whose steps are the same commands, one actor per line. duet stops at the first failure and collects each actor's screenshot and each phone's log.
-- **Reports.** One HTML page per run: every step, its screenshots and log excerpts, with the failure at the top.
+- **Reports and recordings.** One HTML page per run: every step, its screenshots and log excerpts, with the failure at the top. With `--record`, a video of every actor side by side, captioned with the current step.
 - **MCP server.** Every command as a tool. Screenshots come back as images, so the model sees the screen in the tool result.
 
 ## Install
@@ -72,6 +76,7 @@ duet phone tap --text "Full screen"
 duet phone rotation --expect landscape --timeout 3000
 duet phone logs --since-mark --grep "Dialog|rotation"
 duet phone install app-release.apk --resign    # re-sign with the debug key, keep app data
+duet phone unstick                   # release a touch another tool left pressed (see below)
 ```
 
 ### Browser
@@ -84,6 +89,7 @@ duet browser new-tab host --title "Slides" --text "Slide 1"    # the tab to shar
 duet browser click host --text "Join room"
 duet browser click host --text "Present your screen"           # shares the "Slides" tab, no picker
 duet browser wait-for host --text "Presenting a browser tab"
+duet browser front host                                        # sharing switched to the Slides tab; come back
 duet browser screenshot host
 duet browser close host
 ```
@@ -148,18 +154,24 @@ steps: |
 ```sh
 duet scenario check examples/fullscreen-on-a-phone.yaml    # validate; touches no device
 duet scenario run examples/fullscreen-on-a-phone.yaml      # writes runs/<time>-<name>/report.html
+duet scenario run examples/fullscreen-on-a-phone.yaml --record --pace 900   # and video/run.mp4
 ```
 
 - Because the steps are the commands an agent already uses, a sequence it worked out by hand can be saved and replayed after every fix.
 - `note:` lines become headings in the report. `pause: MS` waits; prefer `wait-for`, and keep `pause` for "it should still be like this a moment later".
 - `${VAR}` comes from the environment, and `${SCENARIO_DIR}` is the scenario's folder. An unset variable is an error unless it has a fallback: `${VAR:-fallback}`.
 - Browsers the scenario started are closed at the end. Pass `--keep-open` to leave them up.
+- `--pace MS` waits before each action, so a person or a recording can follow. It never delays a check (`wait-for`, `rotation`, `logs`, `screenshot`), so pacing cannot change a result.
 
 There are two examples in [examples/](examples): a browser-only one that runs anywhere (`share-a-tab.yaml`) and the two-actor phone demo (`fullscreen-on-a-phone.yaml`).
 
-## Reports
+## Reports and recordings
 
 Every step goes to `events.jsonl` in the run folder: actor, action, arguments, result or error, duration, and the screenshot or log file it produced. `duet report [RUN_DIR]` turns a folder into `report.html`. Pass `--inline` to embed the screenshots and get a single file you can send. A scenario run writes its report automatically.
+
+`duet scenario run FILE --record` also records every actor while it runs: each phone with Android's own `screenrecord`, each browser through Chrome's screencast. It then joins them side by side into `video/run.mp4`, lined up in time, with the current step as a caption and the result at the end, and the report shows it at the top. Add `--gif` for a GIF too, and run `duet video RUN_DIR` to rebuild the video later. It needs ffmpeg.
+
+The phone recording only starts if the guard allows looking at the screen, and the phone's status bar (your notification icons) is cropped out of the video. Android stops `screenrecord` after 3 minutes.
 
 ## Safe on someone's own phone
 
@@ -195,6 +207,8 @@ If one surface is enough, use one of them. duet is for the case they leave to yo
 - **A window behind other windows is slow.** macOS reports it as hidden and Chrome runs its timers once a second. A host sharing frames dropped to one a second while the person watched the phone. duet launches Chrome with that throttling off.
 - **uiautomator has blind spots.** It cannot read a screen that never goes idle (live video, endless animation), and it misses some overlays. Fall back to a screenshot and coordinates.
 - **Signatures.** A release APK signed with a different key will not install over the existing app. Re-sign it with the key the installed copy uses (`install --resign`) rather than uninstalling.
+- **A ghost finger.** An automation tool killed in the middle of a gesture can leave an injected touch pressed. From then on Android rejects every injected tap ("pointers already down"), while `adb shell input tap` still exits 0. That is what we found on our test phone the first time duet ran on it. duet checks the input dispatcher's verdict after every tap and fails with its reason, and `duet phone unstick` releases the stuck pointer with a small helper ([android/unstick](android/unstick/Unstick.java)), because `input` can only send pointer 0.
+- **Sharing a tab switches to it.** When a page shares another tab, Chrome brings the shared tab to the front, and the presenter's page stops being drawn (and recorded). `duet browser front` brings it back; the shared tab keeps streaming from the background.
 
 ## The sample app
 
@@ -203,6 +217,7 @@ If one surface is enough, use one of them. duet is for the case they leave to yo
 ## Limits
 
 - Android only. One phone per phone actor. Chrome only.
+- Recording a phone keeps the portrait frame, so a landscape screen appears smaller inside it.
 - `type` sends ASCII only (an `adb shell input` limit).
 - The guard reads `dumpsys` output, whose format varies by Android version and vendor. It fails closed when it cannot parse something.
 
@@ -215,13 +230,13 @@ pnpm test        # unit tests, plus a check that this README matches the CLI
 pnpm build
 ```
 
-The tests never touch a device or launch Chrome; the phone is simulated. `test/readme.test.ts` checks that every `duet` command in this README is a real command with real options, that the scenario example above loads, and that the links to files in this repo exist. See [CONTRIBUTING.md](CONTRIBUTING.md).
+The tests never touch a device or launch Chrome; the phone is simulated. To rebuild the unstick helper (`assets/duet-unstick.dex`), run `scripts/build-unstick.sh` with `ANDROID_HOME` and a JDK. `test/readme.test.ts` checks that every `duet` command in this README is a real command with real options, that the scenario example above loads, and that the links to files in this repo exist. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
 Made by [Aditya Singh](https://github.com/AdityaSingh-byte), built with [Claude Code](https://claude.com/claude-code). It grew out of testing a live video feature on a real phone with an agent, and was rewritten from scratch as a general tool.
 
-Built on [adb](https://developer.android.com/tools/adb), [Puppeteer](https://pptr.dev), the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk), [pngjs](https://github.com/pngjs/pngjs), [yaml](https://github.com/eemeli/yaml) and [zod](https://zod.dev). The sample viewer app started from [Expo](https://expo.dev)'s blank template, and the sample relay uses [ws](https://github.com/websockets/ws).
+Built on [adb](https://developer.android.com/tools/adb), [Puppeteer](https://pptr.dev), [ffmpeg](https://ffmpeg.org), the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk), [pngjs](https://github.com/pngjs/pngjs), [yaml](https://github.com/eemeli/yaml) and [zod](https://zod.dev). The sample viewer app started from [Expo](https://expo.dev)'s blank template, and the sample relay uses [ws](https://github.com/websockets/ws).
 
 ## License
 
