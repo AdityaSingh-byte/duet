@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>duet: test across a real phone and a browser with an AI agent</title>
+<meta name="description" content="duet lets an AI coding agent test a feature on a real Android phone and in visible browsers at the same time, step by step, with device logs, a report and a video of every run.">
+<meta property="og:title" content="duet">
+<meta property="og:description" content="Let an AI coding agent test a feature across a real Android phone and visible browsers, safely and in plain sight.">
+<meta property="og:image" content="https://adityasingh-byte.github.io/duet/media/poster-pairing.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='12' cy='16' r='9' fill='none' stroke='%231d1d1f' stroke-width='3'/%3E%3Ccircle cx='20' cy='16' r='9' fill='none' stroke='%231d1d1f' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --text: #1d1d1f; --muted: #5f6368; --line: #e3e3e3; --bg: #ffffff; --code: #f5f5f5;
+    --link: #1a5fb4; --button: #1d1d1f; --on-button: #ffffff;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --text: #e8e8e8; --muted: #a0a4a8; --line: #2c2c2c; --bg: #111111; --code: #1b1b1b; --link: #8ab4f8; --button: #e8e8e8; --on-button: #111111; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 var(--sans); }
+  main, header, footer { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; padding-bottom: 24px; }
+  header .name { font-weight: 600; font-size: 20px; letter-spacing: -0.01em; }
+  header nav { display: flex; gap: 20px; font-size: 14px; }
+  a { color: var(--link); text-underline-offset: 3px; }
+  header nav a { color: var(--text); text-decoration: none; }
+  header nav a:hover { text-decoration: underline; }
+  h1 { font-size: 32px; line-height: 1.25; font-weight: 650; letter-spacing: -0.015em; margin: 32px 0 16px; max-width: 760px; }
+  h2 { font-size: 20px; line-height: 1.35; font-weight: 600; margin: 0 0 8px; }
+  p { margin: 0 0 16px; max-width: 720px; }
+  .lede { color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 24px 0 8px; }
+  .button { display: inline-block; background: var(--button); color: var(--on-button); text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 16px; border-radius: 6px; }
+  .button:hover { opacity: 0.9; }
+  section { padding: 48px 0; border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: 0; padding-top: 32px; }
+  .meta { font-size: 14px; color: var(--muted); }
+  video, .figure { display: block; width: 100%; height: auto; border-radius: 6px; background: #161616; margin: 16px 0; }
+  .figure { background: transparent; }
+  pre { background: var(--code); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font: 14px/1.6 var(--mono); margin: 16px 0; }
+  code { font-family: var(--mono); font-size: 14px; }
+  p code, li code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  ul { padding-left: 20px; margin: 0 0 16px; max-width: 720px; }
+  li { margin-bottom: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .two > div > h2 { font-size: 16px; }
+  footer { padding-top: 24px; padding-bottom: 48px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
+  @media (max-width: 720px) {
+    h1 { font-size: 26px; }
+    .two { grid-template-columns: 1fr; gap: 8px; }
+    header nav { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="name">duet</span>
+  <nav aria-label="Links">
+    <a href="#demos">Demos</a>
+    <a href="#try">Try it</a>
+    <a href="https://github.com/AdityaSingh-byte/duet/blob/main/docs/story.md">The story</a>
+    <a href="https://github.com/AdityaSingh-byte/duet">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section>
+    <h1>Let an AI agent test a feature on a real phone and in a browser at the same time, while you watch.</h1>
+    <p class="lede">duet is a small harness around adb and Puppeteer. It gives a coding agent such as Claude Code safe commands that each do one thing, runs several actors in one scenario (a host in Chrome, a viewer on an Android phone), and keeps every step with its screenshot, the device log, a report and a video. When something fails, the agent can see why, fix the code, and run the same steps again.</p>
+    <div class="actions">
+      <a class="button" href="https://github.com/AdityaSingh-byte/duet">View on GitHub</a>
+      <a href="#demos">Watch the demos</a>
+    </div>
+  </section>
+
+  <section id="demos">
+    <h2>Sign in on the right browser</h2>
+    <p class="meta">Two browsers and a phone. Recorded by duet on a Samsung Galaxy S24 FE.</p>
+    <video src="media/demo-pairing.mp4" poster="media/poster-pairing.jpg" controls muted playsinline preload="none" aria-label="Two browsers wait to be signed in with their own codes; a phone enters the laptop's code and approves. With the bug the desktop is signed in and the test fails; with the fix the laptop is signed in and it passes."></video>
+    <p>Signing in on the web by approving on your phone. Each browser shows its own 6-digit code; the phone enters one and approves. The planted bug checks the code, then signs in the <em>newest</em> waiting browser. With one browser waiting that is the right one, so every one-browser test passes.</p>
+    <p>The test keeps two browsers waiting, reads the laptop's code from its page, types it on the phone, and checks that the laptop is signed in and the desktop is not. With the bug the desktop gets signed in and the run fails; with the fix it passes all 19 steps.</p>
+<pre><code>laptop: eval "document.querySelector('#code').dataset.code" --save LAPTOP_CODE
+phone: launch --restart
+phone: tap --text "Code from the computer"
+phone: type ${LAPTOP_CODE}
+phone: tap --text "Approve" --exact
+laptop: wait-for --text "Signed in as Phone owner"
+desktop: wait-for --text "Waiting for your phone"</code></pre>
+    <p class="meta"><a href="https://github.com/AdityaSingh-byte/duet/blob/main/examples/sign-in-with-phone.yaml">The whole scenario</a></p>
+  </section>
+
+  <section>
+    <h2>Full screen survives turning the phone sideways</h2>
+    <p class="meta">A browser and a phone. The bug that started this project, rebuilt in an open sample app.</p>
+    <video src="media/demo-rotation.mp4" poster="media/poster-rotation.jpg" controls muted playsinline preload="none" aria-label="A host presents a slides tab from Chrome; a viewer on a phone taps Full screen. With the bug the phone turns sideways and back again; with the fix it stays in landscape."></video>
+    <p>A viewer taps "Full screen" on a presenter's shared tab. The phone turns sideways, the layout switches to two panes, the stage remounts, and full screen closes itself. A screenshot after the tap says nothing happened. The device log says what did: <code>full screen open</code>, <code>stage unmounted</code>, <code>full screen closed</code>, within 150 ms. Unit tests and type checks never see it.</p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <img class="figure" src="media/how-it-works.svg" alt="An AI agent calls duet through MCP or the CLI. duet drives an Android phone over adb and Chrome windows through Puppeteer, and writes every step to a run folder with screenshots, logs, a report and a video." width="960" height="400">
+    <div class="two">
+      <div>
+        <h2>Safe on someone's own phone</h2>
+        <p>Before every action duet checks what is in front. It taps only inside the app under test, looks only at that app or the home screen, and fails closed when it cannot tell. It never uninstalls and never clears the log.</p>
+      </div>
+      <div>
+        <h2>Evidence, not "it passed"</h2>
+        <p>Each run leaves a report with every step, its screenshot and log lines, the failure first, and with <code>--record</code> a captioned video of every actor side by side.</p>
+      </div>
+      <div>
+        <h2>Several actors, one scenario</h2>
+        <p>Steps are the same commands an agent types, one actor per line. Values pass between actors, so a code shown in a browser can be typed on the phone.</p>
+      </div>
+      <div>
+        <h2>For an agent first</h2>
+        <p>Every command prints one JSON object, and the MCP server returns screenshots as images sized so the model can tap what it sees.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="try">
+    <h2>Try it</h2>
+    <p>You need Node 22.12+, pnpm, Google Chrome, and for the phone, adb with USB debugging on.</p>
+<pre><code>git clone https://github.com/AdityaSingh-byte/duet.git
+cd duet && pnpm install && npm link
+
+duet browser open host https://example.com
+duet browser ui host
+duet browser screenshot host
+duet browser close host
+duet phone status
+
+# from Claude Code
+claude mcp add duet -- node /path/to/duet/bin/duet.js mcp</code></pre>
+    <p>The <a href="https://github.com/AdityaSingh-byte/duet#readme">README</a> covers scenarios, recording, the sample apps and what bit us along the way.</p>
+  </section>
+
+  <section>
+    <h2>What it is not</h2>
+    <p>A testing framework. Tools like Maestro, Playwright MCP and many adb-based servers already let an agent drive one phone or one browser well. duet is the part they leave out: several actors in one scenario, on a real phone that may be someone's own, with the log next to every failure. Android and Chrome only for now.</p>
+  </section>
+</main>
+
+<footer>
+  MIT licensed. Made by <a href="https://github.com/AdityaSingh-byte">Aditya Singh</a>, built with Claude Code.
+</footer>
+</body>
+</html>

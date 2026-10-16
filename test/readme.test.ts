@@ -63,6 +63,18 @@ describe('the docs match the CLI', () => {
   });
 });
 
+describe('the project site matches the CLI', () => {
+  it('docs/index.html: every duet command in a code block parses', () => {
+    const html = read('docs/index.html');
+    const lines = [...html.matchAll(/<code>([\s\S]*?)<\/code>/g)]
+      .flatMap((m) => m[1]!.split('\n'))
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith('duet '));
+    expect(lines.length).toBeGreaterThan(3);
+    for (const l of lines) expect(() => checkCommand(splitWords(l).slice(1)), l).not.toThrow();
+  });
+});
+
 describe('the scenario examples load', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'duet-readme-'));
   it('README yaml block', () => {
