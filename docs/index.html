@@ -128,9 +128,8 @@ desktop: wait-for --text "Waiting for your phone"</code></pre>
 
   <section id="try">
     <h2>Try it</h2>
-    <p>You need Node 22.12+, pnpm, Google Chrome, and for the phone, adb with USB debugging on.</p>
-<pre><code>git clone https://github.com/AdityaSingh-byte/duet.git
-cd duet && pnpm install && npm link
+    <p>You need Node 22.12+, Google Chrome, and for the phone, adb with USB debugging on.</p>
+<pre><code>npm install -g duet-qa
 
 duet browser open host https://example.com
 duet browser ui host
@@ -139,8 +138,8 @@ duet browser close host
 duet phone status
 
 # from Claude Code
-claude mcp add duet -- node /path/to/duet/bin/duet.js mcp</code></pre>
-    <p>The <a href="https://github.com/AdityaSingh-byte/duet#readme">README</a> covers scenarios, recording, the sample apps and what bit us along the way.</p>
+claude mcp add duet -- duet mcp</code></pre>
+    <p>The package is <a href="https://www.npmjs.com/package/duet-qa">duet-qa</a> on npm; the command is <code>duet</code>. The <a href="https://github.com/AdityaSingh-byte/duet#readme">README</a> covers scenarios, recording, the sample apps (run those from a clone) and what bit us along the way.</p>
   </section>
 
   <section>

@@ -67,14 +67,20 @@ Finding that takes two actors (someone presenting from a browser, someone watchi
 
 ## Install
 
-You need Node 22.12 or newer, [pnpm](https://pnpm.io), Google Chrome, and for the phone, adb ([Android platform-tools](https://developer.android.com/tools/releases/platform-tools)) with USB debugging turned on.
+You need Node 22.12 or newer, Google Chrome, and for the phone, adb ([Android platform-tools](https://developer.android.com/tools/releases/platform-tools)) with USB debugging turned on.
+
+```sh
+npm install -g duet-qa    # the package is duet-qa; the command is duet
+duet --help
+```
+
+To run the sample apps and the demos, or to change duet itself, work from the source instead (needs [pnpm](https://pnpm.io)):
 
 ```sh
 git clone https://github.com/AdityaSingh-byte/duet.git
 cd duet
 pnpm install          # also builds dist/
-npm link              # puts `duet` on your PATH (or run node bin/duet.js)
-duet --help
+npm link              # puts this copy's `duet` on your PATH
 ```
 
 ## Quick start
@@ -123,7 +129,7 @@ Every command prints one JSON object and exits with a code that says what happen
 ## Use it from Claude Code (MCP)
 
 ```sh
-claude mcp add duet -e DUET_PACKAGE=com.example.yourapp -- node /path/to/duet/bin/duet.js mcp
+claude mcp add duet -e DUET_PACKAGE=com.example.yourapp -- duet mcp
 ```
 
 Or in any MCP client's config:
@@ -132,13 +138,15 @@ Or in any MCP client's config:
 {
   "mcpServers": {
     "duet": {
-      "command": "node",
-      "args": ["/path/to/duet/bin/duet.js", "mcp"],
+      "command": "duet",
+      "args": ["mcp"],
       "env": { "DUET_PACKAGE": "com.example.yourapp" }
     }
   }
 }
 ```
+
+Without a global install, use `npx -y -p duet-qa duet mcp` as the command.
 
 The tools mirror the CLI: `phone_status`, `phone_screenshot`, `phone_tap`, `phone_logs`, `browser_open`, `browser_click`, `scenario_run`, `report_build` and the rest. Screenshots are scaled so that coordinates the model reads off the image can be passed straight to `phone_tap`. The server keeps the phone and the browsers attached between calls.
 
