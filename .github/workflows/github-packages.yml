@@ -1,0 +1,33 @@
+# Publishes duet to GitHub Packages as @adityasingh-byte/duet, so it is listed on the repository and the
+# profile. The npm registry copy is duet-qa (published from a machine with npm login).
+name: Publish to GitHub Packages
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@adityasingh-byte'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      # GitHub Packages needs the package scoped to its owner; npm keeps the name duet-qa.
+      - run: npm pkg set name=@adityasingh-byte/duet
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
