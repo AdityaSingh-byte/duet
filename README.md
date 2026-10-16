@@ -74,6 +74,8 @@ npm install -g duet-qa    # the package is duet-qa; the command is duet
 duet --help
 ```
 
+It is also on GitHub Packages as [`@adityasingh-byte/duet`](https://github.com/AdityaSingh-byte/duet/pkgs/npm/duet).
+
 To run the sample apps and the demos, or to change duet itself, work from the source instead (needs [pnpm](https://pnpm.io)):
 
 ```sh
