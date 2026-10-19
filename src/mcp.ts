@@ -15,7 +15,7 @@ import { RunDir } from './run.js';
 import { runScenario } from './scenario.js';
 import { DuetError } from './util/errors.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 /** Finds screenshot files in a result so the client gets the image itself, not just a path. */
 function imagesIn(value: unknown, out: string[] = []): string[] {

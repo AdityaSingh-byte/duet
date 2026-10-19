@@ -1,6 +1,6 @@
 {
   "name": "duet-qa",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Let an AI coding agent test a feature across a real Android phone and a visible browser, safely and in plain sight.",
   "license": "MIT",
   "author": "Aditya Singh (https://github.com/AdityaSingh-byte)",
