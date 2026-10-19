@@ -2,9 +2,10 @@
   "name": "duet-sample-server",
   "private": true,
   "type": "module",
-  "description": "Relay for the duet sample: a host page shares a tab, viewers receive its frames.",
+  "description": "The duet sample servers: a tab-sharing relay with a sign-in page, and a small community with comments and profiles.",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "community": "node community.mjs"
   },
   "dependencies": {
     "ws": "8.22.0"

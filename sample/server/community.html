@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Community</title>
+<style>
+  :root {
+    --page: #fff; --text: #18181b; --muted: #5f5f66; --line: #e4e4e7; --field: #f4f4f5;
+    --avatar: #e4e4e7; --accent: #2f5bd3; --accent-hover: #2549b0; --accent-tint: #eef2fc; --error: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: var(--page); }
+  header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .mark { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .me { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+  main { max-width: 680px; margin: 0 auto; padding: 28px 32px 48px; }
+  .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--avatar); color: #3f3f46; display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+  .byline { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .byline b { color: var(--text); font-weight: 600; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 14px 0 8px; font-weight: 650; letter-spacing: -0.01em; }
+  .body { margin: 0; }
+  .comments-head { display: flex; align-items: baseline; gap: 8px; margin: 28px 0 4px; padding-top: 20px; border-top: 1px solid var(--line); font-weight: 600; }
+  .comments-head span { color: var(--muted); font-weight: 400; font-size: 13px; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; gap: 12px; padding: 12px 8px; margin: 0 -8px; border-radius: 6px; transition: background-color 1.6s ease-out; }
+  li.new { background: var(--accent-tint); transition: none; }
+  .who { font-size: 13px; color: var(--muted); }
+  .who b { color: var(--text); font-weight: 600; margin-right: 6px; }
+  li p { margin: 2px 0 0; }
+  form { margin-top: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text); resize: none; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; background: #fff; }
+  .actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 10px; }
+  button { font: inherit; font-weight: 600; padding: 8px 18px; border-radius: 6px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #error { color: var(--error); font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { li { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="mark" aria-hidden="true">A</span>Acme Community</div>
+  <div class="me"><span id="me-name"></span><span class="avatar" id="me-avatar" aria-hidden="true"></span></div>
+</header>
+<main>
+  <article id="post" hidden>
+    <div class="byline"><span class="avatar" id="post-avatar" aria-hidden="true"></span><b id="post-author"></b><span id="post-at"></span></div>
+    <h1 id="post-title"></h1>
+    <p class="body" id="post-body"></p>
+    <div class="comments-head">Comments <span id="count"></span></div>
+    <ol id="comments"></ol>
+    <form id="reply">
+      <label for="reply-text" id="reply-label">Reply</label>
+      <textarea id="reply-text" rows="2" placeholder="Write a reply"></textarea>
+      <div class="actions"><span id="error" role="alert"></span><button type="submit" id="send" disabled>Reply</button></div>
+    </form>
+  </article>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const q = new URLSearchParams(location.search);
+  const postId = q.get('post') || '1';
+  const me = q.get('as') || 'maya';
+  const seen = new Set();
+  let first = true;
+
+  const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  function ago(at) {
+    const m = Math.round((Date.now() - at) / 60000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m}m`;
+    if (m < 1440) return `${Math.round(m / 60)}h`;
+    return `${Math.round(m / 1440)}d`;
+  }
+
+  function row(c) {
+    const li = document.createElement('li');
+    li.dataset.comment = c.id;
+    li.innerHTML = '<span class="avatar" aria-hidden="true"></span><div><div class="who"><b></b><span></span></div><p></p></div>';
+    return li;
+  }
+
+  function fill(li, c) {
+    li.querySelector('.avatar').textContent = initials(c.author);
+    li.querySelector('b').textContent = c.author;
+    li.querySelector('.who span').textContent = ago(c.at);
+    li.querySelector('p').textContent = c.text;
+  }
+
+  async function load() {
+    const [post, user] = await Promise.all([
+      fetch(`/api/posts/${postId}`).then((r) => r.json()),
+      fetch(`/api/users/${me}`).then((r) => r.json()),
+    ]).catch(() => [null, null]);
+    if (!post || !user) return;
+    $('me-name').textContent = user.name;
+    $('me-avatar').textContent = initials(user.name);
+    $('reply-label').textContent = `Reply as ${user.name.split(' ')[0]}`;
+    $('post-avatar').textContent = initials(post.author);
+    $('post-author').textContent = post.author;
+    $('post-at').textContent = ago(post.at);
+    $('post-title').textContent = post.title;
+    $('post-body').textContent = post.body;
+    $('count').textContent = String(post.commentList.length);
+    const list = $('comments');
+    for (const c of post.commentList) {
+      let li = list.querySelector(`[data-comment="${c.id}"]`);
+      if (!li) {
+        li = row(c);
+        list.append(li);
+        if (!first && !seen.has(c.id)) {
+          li.classList.add('new');
+          requestAnimationFrame(() => requestAnimationFrame(() => li.classList.remove('new')));
+        }
+        seen.add(c.id);
+      }
+      fill(li, c);
+    }
+    $('post').hidden = false;
+    first = false;
+  }
+
+  $('reply-text').addEventListener('input', () => ($('send').disabled = !$('reply-text').value.trim()));
+  $('reply').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('reply-text').value.trim();
+    if (!text) return;
+    $('send').disabled = true;
+    $('error').textContent = '';
+    const r = await fetch(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ user: me, text }),
+    }).catch(() => null);
+    if (!r || !r.ok) {
+      $('error').textContent = 'Your reply was not sent. Try again.';
+      $('send').disabled = false;
+      return;
+    }
+    const c = await r.json();
+    seen.add(c.id);
+    $('reply-text').value = '';
+    load();
+  });
+
+  load();
+  setInterval(load, 1000);
+</script>
+</body>
+</html>

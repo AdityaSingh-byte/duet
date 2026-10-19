@@ -4,9 +4,9 @@ Lets an AI coding agent test a feature the way a QA person would: on a **real An
 
 duet is not a testing framework. It is a small harness around adb and Puppeteer. It gives an agent (Claude Code through MCP, or anything that can run a CLI) safe commands that each do one thing, records every step with its screenshot, and keeps the device log at hand. The agent can then find out *why* something failed, fix the code, and run the same steps again.
 
-![Two Chrome windows wait to be signed in, each showing a code. A real Android phone enters the laptop's code and approves. With the planted bug the desktop gets signed in instead and the test fails; with the fix the laptop is signed in and the test passes.](docs/media/demo-pairing.gif)
+![Maya has a post open in Chrome; Alex has it open on a real Android phone. Alex comments, and the comment appears in Maya's browser. Alex changes their name to Alex Rivera in Profile and the phone shows the new name. With the planted bug Maya's browser still shows "Alex" and the test fails; with the fix it shows "Alex Rivera", Maya replies, the reply reaches the phone, and all 29 steps pass.](docs/media/demo-comments.gif)
 
-*Three actors in one test, recorded by duet on a real Android phone. Two browsers wait to be signed in; the phone enters the laptop's code and approves. With the planted bug the desktop gets signed in instead, and the test fails. With the fix it passes. [Full video](docs/media/demo-pairing.mp4) · [the scenario](examples/sign-in-with-phone.yaml)*
+*Two people on one post, recorded by duet on a real Android phone and in Chrome. Alex comments from the phone and Maya sees it arrive live. Alex then renames themselves in Profile: the phone shows the new name, but with the planted bug Maya's browser still shows the old one, and the test fails. With the fix all 29 steps pass. Sped up. [Video](docs/media/demo-comments.mp4) · [the scenario](examples/comment-after-rename.yaml)*
 
 > **Status: early (0.1).** Tested end to end on a Samsung Galaxy S24 FE (Android 16) and Chrome 155 on macOS. Other phones and Android versions are untested. The guard fails closed when it cannot read something, so if it misreads your phone, please [open an issue](https://github.com/AdityaSingh-byte/duet/issues) with the output of `duet phone status`.
 
@@ -31,13 +31,21 @@ duet is not a testing framework. It is a small harness around adb and Puppeteer.
 
 ## Demos
 
-Both are real runs on an Android phone, recorded by duet itself (`duet scenario run --record`), against small open sample apps with a bug planted on purpose. Each is run twice: with the bug, where the test fails, and with the fix, where the same steps pass.
+All three are real runs on an Android phone, recorded by duet itself (`duet scenario run --record`), against small open sample apps with a bug planted on purpose. Each is run twice: with the bug, where the test fails, and with the fix, where the same steps pass.
+
+### A comment shows its author's new name: a browser and a phone
+
+A small community app: a feed, posts with comments, and a profile you can edit. Alex uses the [Acme Community app](sample/community-app) on the phone; Maya has the same post open in Chrome, which polls for new comments. In 29 steps the scenario has Alex open the post and comment, checks that the comment reaches Maya's browser, has Alex change their display name in Profile, checks the new name on both screens, then has Maya reply and checks that the reply reaches the phone.
+
+The planted bug (`COMMUNITY_BUG=1` on the [community server](sample/server/community.mjs)) keeps, in each comment, the name its author had when writing it, so a rename never reaches comments already posted. The phone shows your own comments with the name from your profile, so on the phone the rename looks right and a phone-only test passes. Only another person's screen shows the old name, which is why the test needs Maya's browser beside the phone. GIF above; [video](docs/media/demo-comments.mp4); [scenario](examples/comment-after-rename.yaml).
 
 ### Sign in on the right browser: two browsers and a phone
 
+![Two Chrome windows wait to be signed in, each showing a code. A real Android phone enters the laptop's code and approves. With the planted bug the desktop gets signed in instead and the test fails; with the fix the laptop is signed in and the test passes.](docs/media/demo-pairing.gif)
+
 Signing in on the web by approving on your phone, the way messaging apps pair their web versions. A browser shows a 6-digit code; the [duet pair app](sample/pair-app) on the phone enters it and approves; that browser is signed in.
 
-The planted bug (`PAIR_BUG=1` on the [sample server](sample/server)) checks that the code exists, then signs in the *newest* waiting browser. With one browser waiting, that is the right one, so every one-browser test passes. The scenario keeps two browsers waiting, reads the laptop's code with `eval ... --save LAPTOP_CODE`, types it on the phone, and checks that the laptop is signed in and the desktop is not. GIF above; [full video](docs/media/demo-pairing.mp4); [scenario](examples/sign-in-with-phone.yaml).
+The planted bug (`PAIR_BUG=1` on the [sample server](sample/server)) checks that the code exists, then signs in the *newest* waiting browser. With one browser waiting, that is the right one, so every one-browser test passes. The scenario keeps two browsers waiting, reads the laptop's code with `eval ... --save LAPTOP_CODE`, types it on the phone, and checks that the laptop is signed in and the desktop is not. [Full video](docs/media/demo-pairing.mp4); [scenario](examples/sign-in-with-phone.yaml).
 
 ### Full screen survives turning the phone sideways: a browser and a phone
 
@@ -202,7 +210,7 @@ duet scenario run examples/fullscreen-on-a-phone.yaml --record --pace 900   # an
 - Browsers the scenario started are closed at the end. Pass `--keep-open` to leave them up.
 - `--pace MS` waits before each action, so a person or a recording can follow. It never delays a check (`wait-for`, `rotation`, `logs`, `screenshot`), so pacing cannot change a result.
 
-There are two examples in [examples/](examples): a browser-only one that runs anywhere (`share-a-tab.yaml`) and the two-actor phone demo (`fullscreen-on-a-phone.yaml`).
+There are four examples in [examples/](examples): a browser-only one that runs anywhere (`share-a-tab.yaml`), and the three phone demos above (`comment-after-rename.yaml`, `sign-in-with-phone.yaml`, `fullscreen-on-a-phone.yaml`).
 
 ## Reports and recordings
 
@@ -256,9 +264,10 @@ If one surface is enough, use one of them. duet is for the case they leave to yo
 
 [sample/](sample) holds everything the demos run against, with no outside accounts or services:
 
-- [sample/server](sample/server): one small Node server for both demos. It relays a host's shared tab to viewers, and serves the sign-in page and its API. `PAIR_BUG=1` plants the sign-in bug.
+- [sample/server](sample/server): two small Node servers. `server.mjs` relays a host's shared tab to viewers, and serves the sign-in page and its API; `PAIR_BUG=1` plants the sign-in bug. `community.mjs` serves the community's posts, comments and profiles, and the page Maya reads them in; `COMMUNITY_BUG=1` plants the rename bug.
 - [sample/app](sample/app): the room viewer (Expo, `dev.duet.sample`). The full-screen bug is planted on the `demo/rotation-bug` branch and fixed on `main`.
 - [sample/pair-app](sample/pair-app): the duet pair app (Expo, `dev.duet.pair`) that enters a code and approves a browser.
+- [sample/community-app](sample/community-app): the Acme Community app (Expo, `dev.duet.community`), with a feed, posts with comments, and a profile you can edit.
 
 See [sample/README.md](sample/README.md) to run them.
 

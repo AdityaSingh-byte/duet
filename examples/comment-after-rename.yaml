@@ -1,0 +1,57 @@
+# Two people on one post: Alex on the phone, Maya in a browser.
+# Alex comments, then changes their display name. Maya must see the comment arrive live,
+# then see it under the new name, and her reply must reach the phone.
+#
+#   cd sample/server && node community.mjs                   # the fixed server
+#   cd sample/server && COMMUNITY_BUG=1 node community.mjs   # with the planted bug
+#   duet scenario run examples/comment-after-rename.yaml
+#
+# The bug: each comment keeps the name its author had when writing it. The phone shows your
+# own comments with your profile name, so on the phone the rename looks fine. Only Maya's
+# screen shows the old name.
+name: A comment shows its author's new name to everyone
+actors:
+  maya:
+    browser:
+      url: ${SAMPLE_URL:-http://localhost:8765}/?post=1&as=maya
+      size: 960x900
+      position: 0,0
+  phone:
+    phone:
+      package: dev.duet.community
+steps: |
+  note: Maya has the post open in her browser
+  maya: wait-for --text "Dark mode is here"
+
+  note: On the phone, Alex opens the post and comments
+  phone: reverse 8765
+  phone: launch --restart
+  phone: tap --text "Dark mode is here"
+  phone: wait-for --text "Comments"
+  phone: tap --text "Write a comment"
+  phone: type "Looks great on mobile too"
+  phone: tap --text "Post" --exact
+  phone: wait-for --text "Looks great on mobile too"
+
+  note: The comment reaches Maya's browser live
+  maya: wait-for --text "Looks great on mobile too" --timeout 5000
+
+  note: Alex changes their display name in Profile
+  phone: tap --text "Profile" --exact
+  phone: tap --text "Display name"
+  phone: type "Alex Rivera"
+  phone: tap --text "Save" --exact
+  phone: wait-for --text "Saved" --exact
+
+  note: On the phone, the comment shows the new name
+  phone: tap --text "Feed" --exact
+  phone: wait-for --text "Alex Rivera"
+
+  note: Maya's browser must show the new name too
+  maya: wait-for --text "Alex Rivera" --timeout 6000
+
+  note: Maya replies, and the reply reaches the phone
+  maya: fill --field "Reply as Maya" --value "Thanks Alex, glad it works"
+  maya: click --text "Reply" --exact
+  phone: wait-for --text "Thanks Alex, glad it works" --timeout 5000
+  phone: logs --since-mark --grep "acme-community"
